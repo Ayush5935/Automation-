@@ -1,0 +1,152 @@
+EC2 (Elastic Compute Cloud):
+
+Launch and terminate EC2 instances.
+Configure instance attributes, such as security groups and key pairs.
+Create and manage Amazon Machine Images (AMIs).
+
+
+
+Code 
+
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_ec2_key_pair_name' with the desired EC2 key pair name
+ec2_key_pair_name = 'your_ec2_key_pair_name'
+
+# Replace 'your_security_group_id' with the desired EC2 security group ID
+security_group_id = 'your_security_group_id'
+
+# Replace 'your_instance_type' with the desired EC2 instance type (e.g., 't2.micro')
+instance_type = 'your_instance_type'
+
+# Replace 'your_ami_id' with the desired AMI ID
+ami_id = 'your_ami_id'
+
+# Create an EC2 client
+ec2_client = boto3.client('ec2', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Launch EC2 instance
+    instance_response = ec2_client.run_instances(
+        ImageId=ami_id,
+        InstanceType=instance_type,
+        KeyName=ec2_key_pair_name,
+        SecurityGroupIds=[security_group_id],
+        MinCount=1,
+        MaxCount=1
+    )
+    instance_id = instance_response['Instances'][0]['InstanceId']
+    print(f"EC2 instance '{instance_id}' launched successfully.")
+
+    # Terminate EC2 instance
+    ec2_client.terminate_instances(InstanceIds=[instance_id])
+    print(f"EC2 instance '{instance_id}' terminated successfully.")
+
+    # Create and manage AMI (replace 'your_ami_name' with the desired AMI name)
+    ami_name = 'your_ami_name'
+    ami_response = ec2_client.create_image(InstanceId=instance_id, Name=ami_name)
+    ami_id = ami_response['ImageId']
+    print(f"AMI '{ami_id}' created successfully.")
+
+except Exception as e:
+    print(f"Error: {str(e)}")
+
+
+
+---------------------------------------------------------------------------------------------------------
+
+
+#1. Launch EC2 Instance:
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_ec2_key_pair_name', 'your_security_group_id', 'your_instance_type', and 'your_ami_id' with your values
+ec2_key_pair_name = 'your_ec2_key_pair_name'
+security_group_id = 'your_security_group_id'
+instance_type = 'your_instance_type'
+ami_id = 'your_ami_id'
+
+# Create an EC2 client
+ec2_client = boto3.client('ec2', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Launch EC2 instance
+    instance_response = ec2_client.run_instances(
+        ImageId=ami_id,
+        InstanceType=instance_type,
+        KeyName=ec2_key_pair_name,
+        SecurityGroupIds=[security_group_id],
+        MinCount=1,
+        MaxCount=1
+    )
+    instance_id = instance_response['Instances'][0]['InstanceId']
+    print(f"EC2 instance '{instance_id}' launched successfully.")
+
+except Exception as e:
+    print(f"Error launching EC2 instance: {str(e)}")
+
+
+
+
+#2. Terminate EC2 Instance:
+
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_instance_id' with the ID of the EC2 instance to terminate
+instance_id = 'your_instance_id'
+
+# Create an EC2 client
+ec2_client = boto3.client('ec2', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Terminate EC2 instance
+    ec2_client.terminate_instances(InstanceIds=[instance_id])
+    print(f"EC2 instance '{instance_id}' terminated successfully.")
+
+except Exception as e:
+    print(f"Error terminating EC2 instance: {str(e)}")
+
+
+
+#3. Create and Manage AMI:
+
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_instance_id' and 'your_ami_name' with your values
+instance_id = 'your_instance_id'
+ami_name = 'your_ami_name'
+
+# Create an EC2 client
+ec2_client = boto3.client('ec2', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Create and manage AMI
+    ami_response = ec2_client.create_image(InstanceId=instance_id, Name=ami_name)
+    ami_id = ami_response['ImageId']
+    print(f"AMI '{ami_id}' created successfully.")
+
+except Exception as e:
+    print(f"Error creating AMI: {str(e)}")
+
+
+
+
