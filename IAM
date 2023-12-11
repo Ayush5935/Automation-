@@ -1,0 +1,122 @@
+IAM (Identity and Access Management):
+
+Create and manage IAM users, groups, and roles.
+Attach and detach policies to IAM users, groups, and roles.
+Manage access keys and passwords for IAM users.
+
+#Code : 
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_iam_user_name' with the desired IAM username
+iam_user_name = 'your_iam_user_name'
+
+# Create an IAM client
+iam_client = boto3.client('iam', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Create IAM user
+    response = iam_client.create_user(UserName=iam_user_name)
+    print(f"IAM user '{iam_user_name}' created successfully.")
+
+    # Attach a policy to the user (replace 'your_policy_arn' with an actual policy ARN)
+    policy_arn = 'your_policy_arn'
+    iam_client.attach_user_policy(UserName=iam_user_name, PolicyArn=policy_arn)
+    print(f"Policy '{policy_arn}' attached to IAM user '{iam_user_name}'.")
+
+    # Create access keys for the user
+    access_key_response = iam_client.create_access_key(UserName=iam_user_name)
+    access_key_id = access_key_response['AccessKey']['AccessKeyId']
+    secret_access_key = access_key_response['AccessKey']['SecretAccessKey']
+    print(f"Access key created for IAM user '{iam_user_name}':\nAccess Key ID: {access_key_id}\nSecret Access Key: {secret_access_key}")
+
+except Exception as e:
+    print(f"Error: {str(e)}")
+
+
+
+
+
+-------------------------------------------------------------------------------------
+
+
+
+#1. Create IAM User:
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_iam_user_name' with the desired IAM username
+iam_user_name = 'your_iam_user_name'
+
+# Create an IAM client
+iam_client = boto3.client('iam', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Create IAM user
+    response = iam_client.create_user(UserName=iam_user_name)
+    print(f"IAM user '{iam_user_name}' created successfully.")
+
+except Exception as e:
+    print(f"Error creating IAM user: {str(e)}")
+
+
+
+
+#2. Attach Policy to IAM User:
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_iam_user_name' with the desired IAM username
+iam_user_name = 'your_iam_user_name'
+
+# Create an IAM client
+iam_client = boto3.client('iam', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Attach a policy to the user (replace 'your_policy_arn' with an actual policy ARN)
+    policy_arn = 'your_policy_arn'
+    iam_client.attach_user_policy(UserName=iam_user_name, PolicyArn=policy_arn)
+    print(f"Policy '{policy_arn}' attached to IAM user '{iam_user_name}'.")
+
+except Exception as e:
+    print(f"Error attaching policy to IAM user: {str(e)}")
+
+
+
+
+#3. Create Access Keys for IAM User:
+
+
+import boto3
+
+# Replace 'your_access_key' and 'your_secret_key' with your AWS access key and secret key
+aws_access_key = 'your_access_key'
+aws_secret_key = 'your_secret_key'
+
+# Replace 'your_iam_user_name' with the desired IAM username
+iam_user_name = 'your_iam_user_name'
+
+# Create an IAM client
+iam_client = boto3.client('iam', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+
+try:
+    # Create access keys for the user
+    access_key_response = iam_client.create_access_key(UserName=iam_user_name)
+    access_key_id = access_key_response['AccessKey']['AccessKeyId']
+    secret_access_key = access_key_response['AccessKey']['SecretAccessKey']
+    print(f"Access key created for IAM user '{iam_user_name}':\nAccess Key ID: {access_key_id}\nSecret Access Key: {secret_access_key}")
+
+except Exception as e:
+    print(f"Error creating access keys for IAM user: {str(e)}")
