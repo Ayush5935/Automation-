@@ -116,6 +116,51 @@ if __name__ == '__main__':
     main()
 
 
+----
+
+import boto3
+import time
+
+# Destination AWS account information
+destination_account_id = 'destination_account_id'
+destination_region = 'us-east-1'
+copied_ami_id = 'ami-02a93aab9d6557121'  # Replace with your copied AMI ID
+
+def check_ami_status():
+    ec2_destination = boto3.client('ec2', region_name=destination_region)
+
+    max_attempts = 30
+    attempts = 0
+
+    while attempts < max_attempts:
+        try:
+            # Describe the copied AMI in the destination account
+            copied_ami_info = ec2_destination.describe_images(ImageIds=[copied_ami_id])
+
+            # Print additional details about the AMI
+            print(f"Attempt {attempts + 1}/{max_attempts}")
+            print(f"AMI Info: {copied_ami_info}")
+
+            # If the AMI is available, break out of the loop
+            if copied_ami_info['Images'][0]['State'] == 'available':
+                print(f"Copied AMI ID: {copied_ami_info['Images'][0]['ImageId']}")
+                print(f"AMI Name: {copied_ami_info['Images'][0]['Name']}")
+                print(f"Snapshot ID: {copied_ami_info['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']}")
+                break
+        except Exception as e:
+            print(f"Error: {e}")
+
+        # If the AMI is not yet available, wait for a moment before checking again
+        time.sleep(10)
+        attempts += 1
+
+def main():
+    # Check the status of the copied AMI in the destination account
+    check_ami_status()
+
+if __name__ == '__main__':
+    main()
+
 
 
 
