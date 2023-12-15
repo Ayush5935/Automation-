@@ -92,3 +92,50 @@ KMS Policy set:
   ]
 }
 Policy saved to 'kms_policy.json'
+
+
+
+import argparse
+import json
+import boto3
+
+def create_kms_key_demo():
+    # Replace this with your actual code to create a KMS key
+    # ...
+
+def set_kms_policy_demo(key_id):
+    # Replace this with your actual code to set KMS policy
+    # ...
+
+def copy_ami(source_account, source_region, source_ami, target_account, target_region):
+    # Replace this with your actual code to copy AMI
+    # ...
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Copy AMI and create KMS Key Policy')
+    parser.add_argument('--source', required=True, help='Source AWS account ID')
+    parser.add_argument('--source_region', required=True, help='Source AWS region')
+    parser.add_argument('--ami', required=True, help='Source AMI ID to be copied')
+    parser.add_argument('--target', required=True, help='Destination AWS account ID')
+    parser.add_argument('--target_region', required=True, help='Destination AWS region')
+    
+    args = parser.parse_args()
+
+    # Copy AMI
+    ami_copy_result = copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
+    
+    # Create KMS Key and Policy
+    kms_key_id_demo = create_kms_key_demo()
+    policy_json_demo = set_kms_policy_demo(kms_key_id_demo)
+
+    # Print terminal output
+    print(f"AMI {args.ami} got copied from source account {args.source} in region {args.source_region} to "
+          f"destination account {args.target} in region {args.target_region}")
+
+    # Save the result to JSON file
+    output_data = {
+        "Copied_AMI_ID": ami_copy_result,  # Replace ami_copy_result with actual result
+        "KMS_Policy_JSON": json.loads(policy_json_demo)
+    }
+    with open('output.json', 'w') as json_file:
+        json.dump(output_data, json_file, indent=2)
