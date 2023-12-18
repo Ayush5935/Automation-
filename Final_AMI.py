@@ -188,3 +188,113 @@ if __name__ == '__main__':
     copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
 
 
+
+import argparse
+import boto3
+from botocore.exceptions import WaiterError
+
+def role_arn_to_session(**args):
+    client = boto3.client('sts')
+    response = client.assume_role(**args)
+    return boto3.Session(
+        aws_access_key_id=response['Credentials']['AccessKeyId'],
+        aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+        aws_session_token=response['Credentials']['SessionToken'])
+
+def copy_ami(source_account_id, source_region, source_ami_id, destination_account_id, destination_region):
+    source_session = boto3.Session(region_name=source_region)
+    destination_session = role_arn_to_session(
+        RoleArn=f'arn:aws:iam::{destination_account_id}:role/DestinationRole',
+        RoleSessionName='copy-ami-session'
+    )
+
+    ec2_source = source_session.client('ec2', region_name=source_region)
+
+    response = ec2_source.copy_image(
+        SourceImageId=source_ami_id,
+        SourceRegion=source_region,
+        Name='CopiedAMI',
+        Encrypted=True
+    )
+
+    copied_ami_id = response['ImageId']
+
+    ec2_destination = destination_session.client('ec2', region_name=destination_region)
+
+    try:
+        ec2_destination.get_waiter('image_available').wait(ImageIds=[copied_ami_id])
+    except WaiterError as e:
+        print(f"Error waiting for copied AMI in destination account: {e}")
+        return
+
+    copied_ami = ec2_destination.describe_images(ImageIds=[copied_ami_id])['Images'][0]
+
+    print(f"Copied AMI ID: {copied_ami['ImageId']}")
+    print(f"AMI Name: {copied_ami['Name']}")
+    print(f"Snapshot ID: {copied_ami['BlockDeviceMappings'][0]['Ebs']['SnapshotId']}")
+
+    source_snapshot = boto3.resource('ec2', region_name=source_region).Snapshot(
+        copied_ami['BlockDeviceMappings'][0]['Ebs']['SnapshotId'])
+
+    source_sharing = source_snapshot.describe_attribute(Attribute='createVolumePermission')
+    if source_sharing['CreateVolumePermissions'] \
+            and source_sharing['CreateVolumePermissions'][0]['UserId'] != destination_account_id:
+        print("Snapshot already shared with account, creating a copy")
+    else:
+        print("Sharing with target account")
+        source_snapshot.modify_attribute(
+            Attribute='createVolumePermission',
+            OperationType='add',
+            UserIds=[destination_account_id]
+        )
+
+    shared_snapshot = boto3.resource('ec2', region_name=destination_region).Snapshot(
+        copied_ami['BlockDeviceMappings'][0]['Ebs']['SnapshotId'])
+
+    if shared_snapshot.state != "completed":
+        print("Shared snapshot not in completed state, got: " + shared_snapshot.state)
+        return
+
+    copy = shared_snapshot.copy(
+        SourceRegion=source_region,
+        Encrypted=True,
+    )
+
+    copied_snapshot = boto3.resource('ec2', region_name=destination_region).Snapshot(copy['SnapshotId'])
+    copied_snapshot.wait_until_completed()
+
+    print("Created target-owned copy of shared snapshot with id: " + copy['SnapshotId'])
+
+    new_image = boto3.resource('ec2', region_name=destination_region).register_image(
+        Name='copy-' + copied_snapshot.snapshot_id,
+        Architecture='x86_64',
+        RootDeviceName='/dev/sda1',
+        BlockDeviceMappings=[
+            {
+                "DeviceName": "/dev/sda1",
+                "Ebs": {
+                    "SnapshotId": copied_snapshot.snapshot_id,
+                    "VolumeSize": copied_snapshot.volume_size,
+                    "DeleteOnTermination": True,
+                    "VolumeType": "gp2"
+                },
+            }
+        ],
+        VirtualizationType='hvm'
+    )
+
+    print("New AMI created: " + new_image)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Copy AMI from source account to destination account.')
+    parser.add_argument('--source', type=str, help='Source AWS account ID')
+    parser.add_argument('--source_region', type=str, help='Source AWS region')
+    parser.add_argument('--ami', type=str, help='Source AMI ID to copy')
+    parser.add_argument('--target', type=str, help='Destination AWS account ID')
+    parser.add_argument('--target_region', type=str, help='Destination AWS region')
+    args = parser.parse_args()
+
+    copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
+
+
+
