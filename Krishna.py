@@ -255,3 +255,118 @@ def create_instance_and_ami(ec2_destination, ami, instance_name="CopiedInstance"
     # ... (rest of the code)
 
 
+
+
+import argparse
+import boto3
+from botocore.exceptions import WaiterError
+from time import sleep
+
+def assume_role_and_create_instance(target_account_id, target_region, role_name, ami_id, instance_name="CopiedInstance"):
+    sts_client = boto3.client('sts')
+    
+    # Assume role in the target account
+    role_arn = f"arn:aws:iam::{target_account_id}:role/{role_name}"
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn,
+        RoleSessionName="AssumedRoleSession"
+    )
+
+    # Use temporary credentials to create an EC2 instance
+    ec2_client = boto3.client(
+        'ec2',
+        region_name=target_region,
+        aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
+        aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
+        aws_session_token=assumed_role['Credentials']['SessionToken']
+    )
+
+    # Rest of the code to create the EC2 instance
+    response_run_instance = ec2_client.run_instances(
+        ImageId=ami_id,
+        InstanceType='t2.micro',
+        MinCount=1,
+        MaxCount=1,
+        TagSpecifications=[
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {'Key': 'Name', 'Value': instance_name}
+                ]
+            }
+        ]
+    )
+
+    instance_id = response_run_instance['Instances'][0]['InstanceId']
+    print(f"Launched EC2 instance {instance_id} using the copied AMI in the target account.")
+
+    # Wait for the instance to be running
+    ec2_client.get_waiter('instance_running').wait(InstanceIds=[instance_id])
+    print(f"EC2 instance {instance_id} is now running in the target account.")
+
+    # Create a new AMI from the running instance
+    response_create_ami = ec2_client.create_image(
+        InstanceId=instance_id,
+        Name=f'NewAMI_{instance_name}',
+        Description=f'AMI created from instance {instance_id}',
+        NoReboot=True
+    )
+
+    new_ami_id = response_create_ami['ImageId']
+    print(f"Created new AMI {new_ami_id} from the running instance in the target account.")
+
+    return instance_id, new_ami_id
+
+def copy_ami_and_create_instance(source_account_id, source_region, source_ami_id, target_account_id, target_region, role_name):
+    kms_key_id = 'arn:aws:kms:us-west-2:346687249423:key/3cd4107b-98d1-486a-972c-b4734c735a69'
+    source_session = boto3.Session(region_name=source_region)
+    destination_session = boto3.Session(region_name=target_region)
+    ec2_source = source_session.client('ec2', region_name=source_region)
+
+    # Copy AMI in source account
+    response = ec2_source.copy_image(
+        SourceImageId=source_ami_id,
+        SourceRegion=source_region,
+        Name='CopiedAMI',
+        Encrypted=True,
+        KmsKeyId=kms_key_id
+    )
+    copied_ami_id = response['ImageId']
+    print(f"Copying AMI {source_ami_id} to source account... Please wait...")
+
+    try:
+        ec2_source.get_waiter('image_available').wait(ImageIds=[source_ami_id])
+    except WaiterError as e:
+        print(f"Error waiting for AMI in source account: {e}")
+
+    ec2_destination = destination_session.client('ec2', region_name=target_region)
+
+    # Share AMI with destination account
+    response_share_ami = ec2_source.modify_image_attribute(
+        ImageId=source_ami_id,
+        LaunchPermission={
+            'Add': [{'UserId': target_account_id}]
+        }
+    )
+
+    print(f"Sharing AMI {source_ami_id} with destination account... Please wait...")
+
+    try:
+        ec2_destination.get_waiter('image_available').wait(ImageIds=[copied_ami_id])
+    except WaiterError as e:
+        print(f"Error waiting for copied AMI in destination account: {e}")
+
+    # Describe the copied AMI in the destination account
+    try:
+        copied_ami_destination = ec2_destination.describe_images(ImageIds=[copied_ami_id])['Images'][0]
+        print(f"Copied AMI ID in destination account: {copied_ami_destination['ImageId']}")
+        print(f"AMI Name in destination account: {copied_ami_destination['Name']}")
+        print(f"Snapshot ID in destination account: {copied_ami_destination['BlockDeviceMappings'][0]['Ebs']['SnapshotId']}")
+    except Exception as e:
+        print(f"Error describing copied AMI in destination account: {e}")
+
+    # Call the function to create an instance in the target account
+    assume_role_and_create_instance(target_account_id, target_region,
+
+
+
