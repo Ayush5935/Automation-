@@ -366,7 +366,30 @@ def copy_ami_and_create_instance(source_account_id, source_region, source_ami_id
         print(f"Error describing copied AMI in destination account: {e}")
 
     # Call the function to create an instance in the target account
-    assume_role_and_create_instance(target_account_id, target_region,
+    assume_role_and_create_instance(target_account_id, target_region,        role_name, copied_ami_id, instance_name="CopiedInstance")
+
+# Add this code at the end of the copy_ami function
+instance_id, new_ami_id = assume_role_and_create_instance(
+    target_account_id, target_region, role_name, copied_ami_id
+)
+print(f"Instance ID: {instance_id}")
+print(f"New AMI ID created from the instance: {new_ami_id}")
+
+# Return the copied AMI ID for potential further use
+return copied_ami_id
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Copy AMI from source account to destination account.')
+    parser.add_argument('--source', type=str, help='Source AWS account ID')
+    parser.add_argument('--source_region', type=str, help='Source AWS region')
+    parser.add_argument('--ami', type=str, help='Source AMI ID to copy')
+    parser.add_argument('--target', type=str, help='Destination AWS account ID')
+    parser.add_argument('--target_region', type=str, help='Destination AWS region')
+    parser.add_argument('--role_name', type=str, help='Name of the role to assume in the target account')
+    args = parser.parse_args()
+
+    copy_ami_and_create_instance(args.source, args.source_region, args.ami, args.target, args.target_region, args.role_name)
+
 
 
 
