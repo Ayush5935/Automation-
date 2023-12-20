@@ -205,3 +205,53 @@ if __name__ == '__main__':
 
     copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
 
+
+
+
+from botocore.exceptions import WaiterError
+import boto3
+from time import sleep
+
+# ... (existing code)
+
+def assume_role(target_account_id, target_role_name):
+    sts_client = boto3.client('sts')
+
+    role_arn = f'arn:aws:iam::{target_account_id}:role/{target_role_name}'
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn,
+        RoleSessionName='AssumedRoleSession'
+    )
+
+    credentials = assumed_role['Credentials']
+    return {
+        'aws_access_key_id': credentials['AccessKeyId'],
+        'aws_secret_access_key': credentials['SecretAccessKey'],
+        'aws_session_token': credentials['SessionToken']
+    }
+
+def create_instance_and_ami(ec2_destination, ami, instance_name="CopiedInstance"):
+    # Assume role in the target account
+    assumed_role_credentials = assume_role(target_account_id, target_role_name)
+
+    # Create an EC2 instance in the target account
+    ec2_target = boto3.client('ec2', region_name=target_region, **assumed_role_credentials)
+    
+    response_run_instance = ec2_target.run_instances(
+        ImageId=ami,
+        InstanceType='t2.micro',
+        MinCount=1,
+        MaxCount=1,
+        TagSpecifications=[
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {'Key': 'Name', 'Value': instance_name}
+                ]
+            }
+        ]
+    )
+
+    # ... (rest of the code)
+
+
