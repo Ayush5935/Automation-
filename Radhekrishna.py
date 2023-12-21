@@ -432,3 +432,138 @@ if __name__ == '__main__':
 
 
 
+import boto3
+import argparse
+from botocore.exceptions import WaiterError
+
+def copy_ami(source, source_region, ami, target, target_region):
+    kms_key_id = 'arn:aws:kms:us-west-2:346687249423:key/3cd4107b-98d1-486a-972c-b4734c735a69'
+    source_session = boto3.Session(region_name=source_region)
+    destination_session = boto3.Session(region_name=target_region)
+    ec2_source = source_session.client('ec2', region_name=source_region)
+
+    # Copying AMI to Source account
+    response_source = ec2_source.copy_image(
+        SourceImageId=ami,
+        SourceRegion=source_region,
+        Name='CopiedAMI_Source',
+        Encrypted=True,
+        KmsKeyId=kms_key_id
+    )
+    copied_ami_id_source = response_source['ImageId']
+    print(f"Copying AMI {ami} to source account {source}... Please wait...")
+
+    try:
+        ec2_source.get_waiter('image_available').wait(ImageIds=[copied_ami_id_source])
+    except WaiterError as e:
+        print(f"Error waiting for copied AMI in source account: {e}")
+
+    # Sharimg to target account
+    ec2_source.modify_image_attribute(
+        ImageId=copied_ami_id_source,
+        Attribute='launchPermission',
+        LaunchPermission={'Add': [{'UserId': target}]}
+    )
+    print(f"Sharing AMI {copied_ami_id_source} with destination account {target}... Please wait...")
+
+    ec2_destination = destination_session.client('ec2', region_name=target_region)
+    copied_ami_source = ec2_source.describe_images(ImageIds=[copied_ami_id_source])['Images'][0]
+
+    # Assume role and create an instance in the target account
+    instance_id, new_ami_id = assume_role_and_create_instance(target, target_region, copied_ami_id_source,
+                                                              instance_name="CopiedInstance")
+    print(f"Instance ID: {instance_id}")
+    print(f"New AMI ID created from the instance {instance_id}: {new_ami_id}")
+
+    # Confirm with the user before proceeding with the deletion
+    user_input = input("Do you want to delete the copied resources? (Y/N): ").strip().lower()
+
+    if user_input == 'y':
+        # Delete resources in the source and target accounts
+        delete_resources(ec2_source, copied_ami_source['ImageId'],
+                         copied_ami_source['BlockDeviceMappings'][0]['Ebs']['SnapshotId'],
+                         instance_id)
+    else:
+        print("Deletion cancelled. Resources were not deleted.")
+
+def assume_role_and_create_instance(target, target_region, copied_ami_id, instance_name="CopiedInstance"):
+    sts_client = boto3.client('sts')
+    role_arn = f"arn:aws:iam::{target}:role/ami_copy_role"
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn,
+        RoleSessionName="AssumedRoleSession"
+    )
+
+    # Create an EC2 instance using the copied AMI in the target account
+    ec2_client = boto3.client('ec2', region_name=target_region,
+                             aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
+                             aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
+                             aws_session_token=assumed_role['Credentials']['SessionToken'])
+    response_run_instance = ec2_client.run_instances(
+        ImageId=copied_ami_id,
+        InstanceType='t2.micro',
+        MinCount=1,
+        MaxCount=1,
+        TagSpecifications=[
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {'Key': 'Name', 'Value': instance_name}
+                ]
+            }
+        ],
+        NetworkInterfaces=[{'AssociatePublicIpAddress': False, 'DeviceIndex': 0}]
+    )
+
+    instance_id = response_run_instance['Instances'][0]['InstanceId']
+    print(f"Launched EC2 instance {instance_id} using the copied AMI.")
+
+    # Wait for the instance to be running
+    ec2_client.get_waiter('instance_running').wait(InstanceIds=[instance_id])
+    print(f"EC2 instance {instance_id} is now running.")
+
+    # Create a new AMI from the running instance
+    response_create_ami = ec2_client.create_image(
+        InstanceId=instance_id,
+        Name=f'NewAMI_{instance_name}',
+        Description=f'AMI created from instance {instance_id}',
+        NoReboot=True
+    )
+
+    new_ami_id = response_create_ami['ImageId']
+    print(f"Created new AMI {new_ami_id} from the running instance {instance_id}.")
+
+    # Wait until the new AMI is fully available
+    ec2_client.get_waiter('image_available').wait(ImageIds=[new_ami_id])
+    print(f"New AMI {new_ami_id} is now fully available.")
+
+    new_ami_details = ec2_client.describe_images(ImageIds=[new_ami_id])['Images'][0]
+    print(f"Details of the new AMI {new_ami_id}: {new_ami_details}")
+
+    return instance_id, new_ami_id
+
+def delete_resources(ec2_client, ami_id, snapshot_id, instance_id):
+    # Delete AMI and associated snapshot
+    ec2_client.deregister_image(ImageId=ami_id)
+    print(f"Deleted AMI {ami_id}")
+
+    # Delete the snapshot
+    ec2_client.delete_snapshot(SnapshotId=snapshot_id)
+    print(f"Deleted Snapshot {snapshot_id}")
+
+    # Terminate the EC2 instance
+    ec2_client.terminate_instances(InstanceIds=[instance_id])
+    print(f"Terminated EC2 instance {instance_id}")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Copy AMI from source account to destination account.')
+    parser.add_argument('--source', type=str, help='Source AWS account ID')
+    parser.add_argument('--source_region', type=str, help='Source AWS region')
+    parser.add_argument('--ami', type=str, help='Source AMI ID to copy')
+    parser.add_argument('--target', type=str, help='Destination AWS account ID')
+    parser.add_argument('--target_region', type=str, help='Destination AWS region')
+    args = parser.parse_args()
+    copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
+
+
+
