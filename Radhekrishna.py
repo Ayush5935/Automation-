@@ -143,4 +143,56 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     copy_ami_and_create_instance(args.source, args.source_region, args.ami, args.target, args.target_region, args.role_name)
-￼Enter
+
+
+
+
+
+
+def create_instance_and_ami(ec2_destination, ami, instance_name="CopiedInstance"):
+    # Creating EC2 from the AMI (source account)
+    response_run_instance = ec2_destination.run_instances(
+        ImageId=ami,
+        InstanceType='t2.micro',
+        MinCount=1,
+        MaxCount=1,
+        TagSpecifications=[
+            {
+                'ResourceType': 'instance',
+                'Tags': [
+                    {'Key': 'Name', 'Value': instance_name}
+                ]
+            }
+        ],
+        # Explicitly set AssociatePublicIpAddress to False
+        NetworkInterfaces=[{'AssociatePublicIpAddress': False, 'DeviceIndex': 0}]
+    )
+
+    instance_id = response_run_instance['Instances'][0]['InstanceId']
+    print(f"Launched EC2 instance {instance_id} using the copied AMI.")
+
+    # Wait for the instance to be running
+    ec2_destination.get_waiter('instance_running').wait(InstanceIds=[instance_id])
+    print(f"EC2 instance {instance_id} is now running.")
+
+    # Create a new AMI from the running instance
+    response_create_ami = ec2_destination.create_image(
+        InstanceId=instance_id,
+        Name=f'NewAMI_{instance_name}',
+        Description=f'AMI created from instance {instance_id}',
+        NoReboot=True
+    )
+
+    new_ami_id = response_create_ami['ImageId']
+    print(f"Created new AMI {new_ami_id} from the running instance {instance_id}.")
+
+    # Wait until the new AMI is fully available
+    ec2_destination.get_waiter('image_available').wait(ImageIds=[new_ami_id])
+    print(f"New AMI {new_ami_id} is now fully available.")
+
+    # Describe the new AMI
+    new_ami_details = ec2_destination.describe_images(ImageIds=[new_ami_id])['Images'][0]
+    print(f"Details of the new AMI {new_ami_id}: {new_ami_details}")
+
+    return instance_id, new_ami_id, new_ami_details
+
