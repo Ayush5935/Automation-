@@ -586,3 +586,68 @@ def delete_resources(ec2_source, ami_id_source, snapshot_id_source, instance_id,
     print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination}")
 
 
+
+
+
+
+
+
+import boto3
+import argparse
+from botocore.exceptions import WaiterError
+
+def copy_ami(source, source_region, ami, target, target_region):
+    # Existing code ...
+
+    print(f"Instance ID: {instance_id}")
+    print(f"New AMI ID created from the instance {instance_id}: {new_ami_id}")
+
+    # Ask the user if they want to delete the copied resources
+    delete_confirmation = input("Do you want to delete the copied resources? (Y/N): ").strip().lower()
+
+    if delete_confirmation == 'y':
+        # New code: delete copied AMI and associated snapshot in source account
+        delete_resources(source, source_region, copied_ami_id_source)
+        # New code: delete instance and new AMI in target account
+        delete_resources(target, target_region, new_ami_id, instance_id)
+
+def delete_resources(account_id, region, ami_id=None, instance_id=None):
+    sts_client = boto3.client('sts')
+    role_arn = f"arn:aws:iam::{account_id}:role/ami_copy_role"
+    assumed_role_client = assume_role_client(role_arn)
+
+    if ami_id:
+        # Delete AMI
+        ec2_client = assumed_role_client.create_client('ec2', region_name=region)
+        delete_ami(ec2_client, ami_id)
+
+    if instance_id:
+        # Delete instance
+        ec2_client = boto3.client('ec2', region_name=region)
+        delete_instance(ec2_client, instance_id)
+
+def delete_ami(ec2_client, ami_id):
+    ec2_client.deregister_image(ImageId=ami_id)
+    print(f"Deleted AMI from Target Account {ami_id}")
+
+def delete_instance(ec2_client, instance_id):
+    ec2_client.terminate_instances(InstanceIds=[instance_id])
+    print(f"Terminated Instance from Target Account {instance_id}")
+
+def assume_role_client(role_arn):
+    # Existing code ...
+
+if __name__ == '__main__':
+    # Existing code ...
+
+    # Ask the user if they want to delete the copied AMI and associated snapshot in the source account
+    delete_source_ami_confirmation = input("Do you want to delete the copied AMI and associated snapshot in the source account? (Y/N): ").strip().lower()
+
+    if delete_source_ami_confirmation == 'y':
+        # New code: delete copied AMI and associated snapshot in source account
+        delete_resources(args.source, args.source_region, args.ami)
+
+    # Call the copy_ami function
+    copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
+
+
