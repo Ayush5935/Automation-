@@ -651,3 +651,68 @@ if __name__ == '__main__':
     copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region)
 
 
+
+
+
+
+
+
+import boto3
+import argparse
+from botocore.exceptions import WaiterError
+
+def copy_ami(source, source_region, ami, target, target_region):
+    # Existing code ...
+
+    print(f"Instance ID: {instance_id}")
+    print(f"New AMI ID created from the instance {instance_id}: {new_ami_id}")
+
+    # Ask the user if they want to delete the copied resources
+    delete_confirmation = input("Do you want to delete the copied resources? (Y/N): ").strip().lower()
+
+    if delete_confirmation == 'y':
+        # Assume role for operations in the target account
+        ec2_target = assume_role(target, target_region)
+        
+        # New code: delete copied resources in both source and target accounts
+        delete_resources(ec2_source, copied_ami_source['ImageId'],
+                         copied_ami_source['BlockDeviceMappings'][0]['Ebs']['SnapshotId'],
+                         ec2_target, new_ami_id, instance_id)
+
+def assume_role(account_id, region):
+    sts_client = boto3.client('sts')
+    role_arn = f"arn:aws:iam::{account_id}:role/ami_copy_role"
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn,
+        RoleSessionName="AssumedRoleSession"
+    )
+
+    return boto3.client('ec2', region_name=region,
+                       aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
+                       aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
+                       aws_session_token=assumed_role['Credentials']['SessionToken'])
+
+def assume_role_and_create_instance(target, target_region, copied_ami_id, instance_name="CopiedInstance"):
+    # Existing code ...
+
+def delete_resources(ec2_source, ami_id_source, snapshot_id_source, ec2_destination,
+                     ami_id_destination, instance_id):
+    ec2_source.deregister_image(ImageId=ami_id_source)
+    print(f"Deleted AMI from Source Account {ami_id_source}")
+
+    ec2_source.delete_snapshot(SnapshotId=snapshot_id_source)
+    print(f"Deleted Snapshot {snapshot_id_source} of AMI {ami_id_source} from Source Account")
+
+    ec2_destination.terminate_instances(InstanceIds=[instance_id])
+    print(f"Terminated EC2 instance from Target Account {instance_id}")
+
+    ec2_destination.deregister_image(ImageId=ami_id_destination)
+    print(f"Deleted AMI from Target Account {ami_id_destination}")
+
+    snapshot_id_destination = ec2_destination.describe_images(ImageIds=[ami_id_destination])['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
+    ec2_destination.delete_snapshot(SnapshotId=snapshot_id_destination)
+    print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination} from Target Account")
+
+if __name__ == '__main__':
+    # Existing code ...
+
