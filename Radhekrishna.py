@@ -567,3 +567,22 @@ if __name__ == '__main__':
 
 
 
+
+def delete_resources(ec2_source, ami_id_source, snapshot_id_source, instance_id, assumed_role_client, ami_id_destination, snapshot_id_destination):
+    # Delete AMI and associated snapshot in source account
+    ec2_source.deregister_image(ImageId=ami_id_source)
+    print(f"Deleted AMI from Source Account {ami_id_source}")
+    ec2_source.delete_snapshot(SnapshotId=snapshot_id_source)
+    print(f"Deleted Snapshot {snapshot_id_source} of AMI {ami_id_source} from Source Account")
+
+    # Delete instance in the target account using assumed role
+    assumed_role_client.terminate_instances(InstanceIds=[instance_id])
+    print(f"Terminated Instance {instance_id}")
+
+    # Delete new AMI and associated snapshot in the target account using assumed role
+    assumed_role_client.deregister_image(ImageId=ami_id_destination)
+    print(f"Deleted AMI {ami_id_destination}")
+    assumed_role_client.delete_snapshot(SnapshotId=snapshot_id_destination)
+    print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination}")
+
+
