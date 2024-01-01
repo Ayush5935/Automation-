@@ -157,3 +157,30 @@ if __name__ == '__main__':
     args = parser.parse_args()
     sso_access_token, sso_session_obj = sso_session()
     copy_ami(args.source, args.source_region, args.ami, args.target, args.target_region, sso_access_token, sso_session_obj)
+
+
+
+
+
+
+def copy_ami(source, source_region, ami, target, target_region, sso_access_token, sso_session):
+    sso_client = sso_session.client('sso', region_name=source_region)
+
+    # Assume role to get credentials
+    sts_client = sso_client.client('sts')
+    role_arn = "arn:aws:iam::{target}:role/ami_copy_role"  # Update with your role ARN
+    assumed_role = sts_client.assume_role(RoleArn=role_arn, RoleSessionName="AssumedRoleSession")
+    
+    # Create a new session using the assumed role credentials
+    assumed_role_credentials = assumed_role['Credentials']
+    ec2_session = boto3.Session(
+        aws_access_key_id=assumed_role_credentials['AccessKeyId'],
+        aws_secret_access_key=assumed_role_credentials['SecretAccessKey'],
+        aws_session_token=assumed_role_credentials['SessionToken']
+    )
+
+    # Create ec2 client using the new session
+    source_ec2 = ec2_session.client('ec2', region_name=source_region)
+
+    # Rest of the code remains
+
