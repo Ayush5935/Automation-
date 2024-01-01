@@ -98,67 +98,13 @@ def copy_ami(source, source_region, ami, target, target_region, sso_access_token
     delete_confirmation = input("Do you want to delete the copied resources? (Y/N): ").strip().lower()
 
     if delete_confirmation == 'y':
-        target_ec2 = assume_role(target, target_region)
+        target_ec2 = session_with_role.client('ec2', region_name=target_region)
         delete_resources(source_ec2, copied_ami_source['ImageId'], copied_ami_source['BlockDeviceMappings'][0]['Ebs']['SnapshotId'], target_ec2, new_ami_id, instance_id)
 
 def assume_role_and_create_instance(target, target_region, copied_ami_id, instance_name="CopiedInstance", sso_session=None):
-    assumed_role_credentials = assume_role(target, target_region, sso_session)
-    target_ec2 = boto3.client(
-        'ec2',
-        region_name=target_region,
-import boto3
-import argparse
-from botocore.exceptions import WaiterError
-from time import sleep
-import webbrowser
-
-region = 'us-west-2'
-
-def sso_session():
-    session = boto3.Session()
-    start_url = 'https://d-92670ca28f.awsapps.com/start#/'
-    sso_oidc = session.client('sso-oidc', region_name=region)
-
-    client_creds = sso_oidc.register_client(
-        clientName='myapp',
-        clientType='public',
-    )
-
-    device_authorization = sso_oidc.start_device_authorization(
-        clientId=client_creds['clientId'],
-        clientSecret=client_creds['clientSecret'],
-        startUrl=start_url,
-    )
-
-    url = device_authorization['verificationUriComplete']
-    device_code = device_authorization['deviceCode']
-    expires_in = device_authorization['expiresIn']
-    interval = device_authorization['interval']
-
-    webbrowser.open(url, autoraise=True)
-
-    for n in range(1, expires_in // interval + 1):
-        sleep(interval)
-        try:
-            token = sso_oidc.create_token(
-                grantType='urn:ietf:params:oauth:grant-type:device_code',
-                deviceCode=device_code,
-                clientId=client_creds['clientId'],
-                clientSecret=client_creds['clientSecret'],
-            )
-            break
-        except sso_oidc.exceptions.AuthorizationPendingException:
-            pass
-
-    access_token = token['accessToken']
-    sso_client = session.client('sso', region_name=region, aws_access_key_id=access_token, aws_secret_access_key=access_token, aws_session_token=access_token)
-
-    return access_token, sso_client
-
-def copy_ami(source, source_region, ami, target, target_region, sso_access_token, sso_session):
     role_creds = sso_session.get_role_credentials(
         roleName='DishWpass',
-        accountId=source,
+        accountId=target,
         accessToken=sso_access_token,
     )['roleCredentials']
 
@@ -168,55 +114,9 @@ def copy_ami(source, source_region, ami, target, target_region, sso_access_token
         aws_session_token=role_creds['sessionToken'],
     )
 
-    source_ec2 = session_with_role.client('ec2', region_name=source_region)
-
-    response_source = source_ec2.copy_image(
-        SourceImageId=ami,
-        SourceRegion=source_region,
-        Name='CopiedAMI_Source',
-        Encrypted=True,
-        KmsKeyId='arn:aws:kms:us-west-2:346687249423:key/3cd4107b-98d1-486a-972c-b4734c735a69'
-    )
-
-    copied_ami_id_source = response_source['ImageId']
-    print(f"Copying AMI {ami} to source account {source}... Please wait...")
-
-    try:
-        source_ec2.get_waiter('image_available').wait(ImageIds=[copied_ami_id_source])
-    except WaiterError as e:
-        print(f"Error waiting for copied AMI in source account: {e}")
-
-    source_ec2.modify_image_attribute(
-        ImageId=copied_ami_id_source,
-        Attribute='launchPermission',
-        LaunchPermission={'Add': [{'UserId': target}]}
-    )
-
-    print(f"Sharing AMI {copied_ami_id_source} with destination account {target}... Please wait...")
-
-    target_ec2 = session_with_role.client('ec2', region_name=target_region)
-
-    copied_ami_source = source_ec2.describe_images(ImageIds=[copied_ami_id_source])['Images'][0]
-
-    instance_id, new_ami_id = assume_role_and_create_instance(target, target_region, copied_ami_id_source, instance_name="CopiedInstance", sso_session=sso_session)
-
-    print(f"Instance ID: {instance_id}")
-    print(f"New AMI ID created from the instance {instance_id}: {new_ami_id}")
-
-    delete_confirmation = input("Do you want to delete the copied resources? (Y/N): ").strip().lower()
-
-    if delete_confirmation == 'y':
-        target_ec2 = assume_role(target, target_region)
-        delete_resources(source_ec2, copied_ami_source['ImageId'], copied_ami_source['BlockDeviceMappings'][0]['Ebs']['SnapshotId'], target_ec2, new_ami_id, instance_id)
-
-def assume_role_and_create_instance(target, target_region, copied_ami_id, instance_name="CopiedInstance", sso_session=None):
-    assumed_role_credentials = assume_role(target, target_region, sso_session)
-    target_ec2 = boto3.client(
+    target_ec2 = session_with_role.client(
         'ec2',
         region_name=target_region,
-        aws_access_key_id=assumed_role_credentials['AccessKeyId'],
-        aws_secret_access_key=assumed_role_credentials['SecretAccessKey'],
-        aws_session_token=assumed_role_credentials['SessionToken']
     )
 
     response_run_instance = target_ec2.run_instances(
@@ -264,16 +164,23 @@ def delete_resources(ec2_source, ami_id_source, snapshot_id_source, ec2_destinat
     ec2_destination.deregister_image(ImageId=ami_id_destination)
     print(f"Deleted AMI from Target Account {ami_id_destination}")
 
-    snapshot_id_destination = ec2_destination.describe_images(ImageIds=[ami_id_destination])['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
+    snapshot_id_destination = ec2_destination.describe_images(ImageIds=[ami_id_destination])['Images'][0][
+        'BlockDeviceMappings'][0]['Ebs']['SnapshotId']
 
     ec2_destination.delete_snapshot(SnapshotId=snapshot_id_destination)
     print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination} from Target Account")
 
 def assume_role(target, region, sso_session=None):
-    sts_client = sso_session.client('sts') if sso_session else boto3.client('sts')
-    role_arn = f"arn:aws:iam::{target}:role/ami_copy_role"
+    sts_client = boto3.client('sts') if sso_session is None else sso_session.client('sts')
+
+    role_creds = sso_session.get_role_credentials(
+        roleName='DishWpass',
+        accountId=target,
+        accessToken=sso_access_token,
+    )['roleCredentials']
+
     assumed_role = sts_client.assume_role(
-        RoleArn=role_arn,
+        RoleArn=role_creds['arn'],
         RoleSessionName="AssumedRoleSession"
     )
 
