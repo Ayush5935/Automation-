@@ -1,45 +1,19 @@
-def delete_resources(ec2_source, ami_id_source, snapshot_id_source, target_role_name, target_region, ami_id_destination, instance_id, sso_session):
+# ...
+
+# Get information about the copied AMI in the target account
+response = target_ec2.describe_images(ImageIds=[ami_id_destination])
+
+if 'Images' in response and response['Images']:
+    snapshot_id_destination = response['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
+    print(f"Snapshot ID associated with AMI {ami_id_destination} in the target account: {snapshot_id_destination}")
+
+    # Delete the snapshot associated with the AMI in the target account
     try:
-        # Delete resources in the source account
-        ec2_source.deregister_image(ImageId=ami_id_source)
-        print(f"Deleted AMI from Source Account {ami_id_source}")
+        target_ec2.delete_snapshot(SnapshotId=snapshot_id_destination)
+        print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination} from Target Account")
+    except Exception as snapshot_error:
+        print(f"Error deleting snapshot {snapshot_id_destination} associated with AMI {ami_id_destination}: {snapshot_error}")
+else:
+    print(f"No information found for AMI {ami_id_destination} in the target account.")
 
-        ec2_source.delete_snapshot(SnapshotId=snapshot_id_source)
-        print(f"Deleted Snapshot {snapshot_id_source} of AMI {ami_id_source} from Source Account")
-
-        # Assume the role in the target account
-        target_role_creds = sso_session.get_role_credentials(
-            roleName=target_role_name,
-            accountId=args.target,
-            accessToken=sso_access_token,
-        )['roleCredentials']
-
-        target_session = boto3.Session(
-            aws_access_key_id=target_role_creds['accessKeyId'],
-            aws_secret_access_key=target_role_creds['secretAccessKey'],
-            aws_session_token=target_role_creds['sessionToken'],
-            region_name=target_region
-        )
-        target_ec2 = target_session.client('ec2')
-
-        # Delete resources in the target account
-        target_ec2.deregister_image(ImageId=ami_id_destination)
-        print(f"Deleted AMI from Target Account {ami_id_destination}")
-
-        # Get information about the copied AMI in the target account
-        response = target_ec2.describe_images(ImageIds=[ami_id_destination])
-
-        if 'Images' in response and response['Images']:
-            snapshot_id_destination = response['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
-            target_ec2.delete_snapshot(SnapshotId=snapshot_id_destination)
-            print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination} from Target Account")
-        else:
-            print(f"No information found for AMI {ami_id_destination} in the target account.")
-
-        # Terminate the EC2 instance in the target account
-        target_ec2.terminate_instances(InstanceIds=[instance_id])
-        print(f"Terminated EC2 instance from Target Account {instance_id}")
-
-    except Exception as e:
-        print(f"Error deleting resources: {e}")
-        raise
+# ...
