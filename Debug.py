@@ -26,9 +26,15 @@ def delete_resources(ec2_source, ami_id_source, snapshot_id_source, target_role_
         target_ec2.deregister_image(ImageId=ami_id_destination)
         print(f"Deleted AMI from Target Account {ami_id_destination}")
 
-        snapshot_id_destination = target_ec2.describe_images(ImageIds=[ami_id_destination])['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
-        target_ec2.delete_snapshot(SnapshotId=snapshot_id_destination)
-        print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination} from Target Account")
+        # Get information about the copied AMI in the target account
+        response = target_ec2.describe_images(ImageIds=[ami_id_destination])
+
+        if 'Images' in response and response['Images']:
+            snapshot_id_destination = response['Images'][0]['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
+            target_ec2.delete_snapshot(SnapshotId=snapshot_id_destination)
+            print(f"Deleted Snapshot {snapshot_id_destination} of AMI {ami_id_destination} from Target Account")
+        else:
+            print(f"No information found for AMI {ami_id_destination} in the target account.")
 
         # Terminate the EC2 instance in the target account
         target_ec2.terminate_instances(InstanceIds=[instance_id])
@@ -37,6 +43,3 @@ def delete_resources(ec2_source, ami_id_source, snapshot_id_source, target_role_
     except Exception as e:
         print(f"Error deleting resources: {e}")
         raise
-
-# Call the updated function
-delete_resources(source_ec2, copied_ami_source['ImageId'], copied_ami_source['BlockDeviceMappings'][0]['Ebs']['SnapshotId'], 'DishWPaaSAdministrator', args.target_region, new_ami_id, instance_id, sso_session_obj)
