@@ -1,6 +1,15 @@
+import os
 import boto3
 import json
 from kubernetes import client, config
+
+# Set the path for the kubernetes module in the deployment package
+kubernetes_module_path = "/opt/python/lib/python3.8/site-packages/kubernetes"
+
+# Check if the kubernetes module is available, if not, extract it from the deployment package
+if not os.path.exists(kubernetes_module_path):
+    import shutil
+    shutil.unpack_archive("/var/task/kubernetes.zip", "/opt/python/lib/python3.8/site-packages/")
 
 def get_eks_cluster_endpoint(cluster_name):
     eks_client = boto3.client('eks')
@@ -32,8 +41,22 @@ def get_nodes_count():
     nodes = k8s_api.list_node()
     return len(nodes.items)
 
-def update_dynamodb(cluster_name, is_equal):
-    dynamodb = boto3.resource('dynamodb')
+def assume_role_and_update_dynamodb(cluster_name, is_equal):
+    # Replace 'DynamoDBAssumeRole' with the actual IAM role that has DynamoDB access
+    assume_role_arn = 'arn:aws:iam::YOUR_ACCOUNT_ID:role/DynamoDBAssumeRole'
+    
+    # Assume the role
+    sts_client = boto3.client('sts')
+    assumed_role = sts_client.assume_role(
+        RoleArn=assume_role_arn,
+        RoleSessionName='AssumedRoleSession'
+    )
+
+    # Create a DynamoDB resource using the assumed role credentials
+    dynamodb = boto3.resource('dynamodb', aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
+                              aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
+                              aws_session_token=assumed_role['Credentials']['SessionToken'])
+
     table_name = 'YOUR_DYNAMODB_TABLE_NAME'  # Replace with your actual DynamoDB table name
     table = dynamodb.Table(table_name)
 
@@ -61,8 +84,8 @@ def lambda_handler(event, context):
         # Check if the number of running pods is equal to the number of nodes
         is_equal = len(running_pod_details) == nodes_count
 
-        # Call the function to update DynamoDB based on the condition
-        update_dynamodb(cluster_name, is_equal)
+        # Assume role and update DynamoDB based on the condition
+        assume_role_and_update_dynamodb(cluster_name, is_equal)
 
         # Print the information
         print(f'EKS Cluster Endpoint: {cluster_endpoint}')
@@ -86,4 +109,3 @@ def lambda_handler(event, context):
 
 # Uncomment the next line to run the Lambda function locally
 # lambda_handler(None, None)
-￼Enter
