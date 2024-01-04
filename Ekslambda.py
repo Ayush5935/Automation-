@@ -3,13 +3,30 @@ import boto3
 import json
 from kubernetes import client, config
 
-# Set the path for the kubernetes module in the deployment package
-kubernetes_module_path = "/opt/python/lib/python3.8/site-packages/kubernetes"
+def get_eks_cluster_endpoint(cluster_name):
+    eks_client = boto3.client('eks')
+    response = eks_client.describe_cluster(name=cluster_name)
+    return response['cluster']['endpoint']
 
-# Check if the kubernetes module is available, if not, extract it from the deployment package
-if not os.path.exists(kubernetes_module_path):
-    import shutil
-    shutil.unpack_archive("/var/task/kubernetes.zip", "/opt/python/lib/python3.8/site-packages/")
+def get_running_pod_details():
+    config.load_kube_config()
+    k8s_api = client.CoreV1Api()
+
+    pods = k8s_api.list_pod_for_all_namespaces()
+    running_pod_details = []
+
+    for pod in pods.items:
+        if pod.status.phase == 'Running':
+            running_pod_details.append({
+                'Namespace': pod.metadata.namespace,
+                'Name': pod.metadata.name,
+                'Ready': pod.status.container_statuses[0].ready if pod.status.container_statuses else None,
+                'Status': pod.status.phase,
+            })
+import os
+import boto3
+import json
+from kubernetes import client, config
 
 def get_eks_cluster_endpoint(cluster_name):
     eks_client = boto3.client('eks')
@@ -44,7 +61,7 @@ def get_nodes_count():
 def assume_role_and_update_dynamodb(cluster_name, is_equal):
     # Replace 'DynamoDBAssumeRole' with the actual IAM role that has DynamoDB access
     assume_role_arn = 'arn:aws:iam::YOUR_ACCOUNT_ID:role/DynamoDBAssumeRole'
-    
+
     # Assume the role
     sts_client = boto3.client('sts')
     assumed_role = sts_client.assume_role(
@@ -69,43 +86,43 @@ def assume_role_and_update_dynamodb(cluster_name, is_equal):
 
 def lambda_handler(event, context):
     try:
-        # Replace 'cc-ndc-eks-cluster-dev-cluster' with your actual EKS cluster name
-        cluster_name = 'cc-ndc-eks-cluster-dev-cluster'
+        # List of EKS clusters
+        eks_clusters = ['cc-ndc-eks-cluster-dev-cluster', 'another-eks-cluster']
 
-        # Get EKS cluster endpoint
-        cluster_endpoint = get_eks_cluster_endpoint(cluster_name)
+        for cluster_name in eks_clusters:
+            # Get EKS cluster endpoint
+            cluster_endpoint = get_eks_cluster_endpoint(cluster_name)
 
-        # Get details for running pods from Kubernetes API
-        running_pod_details = get_running_pod_details()
+            # Get details for running pods from Kubernetes API
+            running_pod_details = get_running_pod_details()
 
-        # Get the count of nodes in the EKS cluster
-        nodes_count = get_nodes_count()
+            # Get the count of nodes in the EKS cluster
+            nodes_count = get_nodes_count()
 
-        # Check if the number of running pods is equal to the number of nodes
-        is_equal = len(running_pod_details) == nodes_count
+            # Check if the number of running pods is equal to the number of nodes
+            is_equal = len(running_pod_details) == nodes_count
 
-        # Assume role and update DynamoDB based on the condition
-        assume_role_and_update_dynamodb(cluster_name, is_equal)
+            # Assume role and update DynamoDB based on the condition
+            assume_role_and_update_dynamodb(cluster_name, is_equal)
 
-        # Print the information
-        print(f'EKS Cluster Endpoint: {cluster_endpoint}')
-        print('Running Pod Details:')
-        for pod in running_pod_details:
-            print(f'  Namespace: {pod["Namespace"]}')
-            print(f'  Name: {pod["Name"]}')
-            print(f'  Ready: {pod["Ready"]}')
-            print(f'  Status: {pod["Status"]}')
-        print(f'Number of Nodes in the Cluster: {nodes_count}')
+            # Print the information
+            print(f'EKS Cluster: {cluster_name}')
+            print(f'EKS Cluster Endpoint: {cluster_endpoint}')
+            print('Running Pod Details:')
+            for pod in running_pod_details:
+                print(f'  Namespace: {pod["Namespace"]}')
+                print(f'  Name: {pod["Name"]}')
+                print(f'  Ready: {pod["Ready"]}')
+                print(f'  Status: {pod["Status"]}')
+            print(f'Number of Nodes in the Cluster: {nodes_count}')
 
-        # If you want to perform additional logic or actions based on the pod information and node count, do it here
+            # If you want to perform additional logic or actions based on the pod information and node count, do it here
 
         return {
             'statusCode': 200,
-            'body': json.dumps({'ClusterEndpoint': cluster_endpoint, 'RunningPodDetails': running_pod_details, 'NodesCount': nodes_count})
+            'body': json.dumps({'Message': 'Lambda function executed for all clusters'})
         }
     except Exception as e:
         print(f"Error in lambda_handler: {e}")
         raise
-
-# Uncomment the next line to run the Lambda function locally
-# lambda_handler(None, None)
+￼Enter
