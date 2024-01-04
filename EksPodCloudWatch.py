@@ -1,81 +1,56 @@
 import boto3
 import json
-import time
 from kubernetes import client, config
 
-def create_cloudwatch_event_rule(lambda_function_name):
-    cloudwatch_events_client = boto3.client('events')
-
-    rule_name = f'{lambda_function_name}-rule'
-    schedule_expression = 'rate(15 minutes)'
-
-    response = cloudwatch_events_client.put_rule(
-        Name=rule_name,
-        ScheduleExpression=schedule_expression,
-        State='ENABLED'
-    )
-
-    target_arn = f'arn:aws:lambda:{response["RuleArn"].split(":")[3]}:{response["RuleArn"].split(":")[4]}:function:{lambda_function_name}'
-
-    cloudwatch_events_client.put_targets(
-        Rule=rule_name,
-        Targets=[
-            {
-                'Id': '1',
-                'Arn': target_arn
-            },
-        ]
-    )
-
-    return rule_name
-
-def lambda_handler(event, context):
-    # Replace 'your-cluster-name' with your actual EKS cluster name
-    cluster_name = 'your-cluster-name'
-
-    # Create an EKS client
+def get_eks_cluster_endpoint(cluster_name):
     eks_client = boto3.client('eks')
+    response = eks_client.describe_cluster(name=cluster_name)
+    return response['cluster']['endpoint']
 
-    try:
-        # Describe the EKS cluster
-        response = eks_client.describe_cluster(name=cluster_name)
+def get_running_pod_details():
+    config.load_kube_config()
+    k8s_api = client.CoreV1Api()
 
-        # Get the EKS cluster endpoint
-        cluster_endpoint = response['cluster']['endpoint']
+    pods = k8s_api.list_pod_for_all_namespaces()
+    running_pod_details = []
 
-        # Load the Kubernetes configuration for the EKS cluster
-        config.load_kube_config()
-        
-        # Create a Kubernetes API client
-        k8s_api = client.CoreV1Api()
+    for pod in pods.items:
+        if pod.status.phase == 'Running':
+            running_pod_details.append({
+                'Namespace': pod.metadata.namespace,
+                'Name': pod.metadata.name,
+                'Ready': pod.status.container_statuses[0].ready if pod.status.container_statuses else None,
+                'Status': pod.status.phase,
+            })
 
-        # Retrieve pod information
-        pods = k8s_api.list_namespaced_pod(namespace='default')
+    return running_pod_details
 
-        # Extract relevant information from the pods
-        pod_info = {
-            'ClusterName': cluster_name,
-            'PodCount': len(pods.items),
-            'PodDetails': [{'Name': pod.metadata.name, 'Status': pod.status.phase} for pod in pods.items]
-        }
+def get_nodes_count():
+    config.load_kube_config()
+    k8s_api = client.CoreV1Api()
 
-        # Your custom logic with the pod information goes here
+    nodes = k8s_api.list_node()
+    return len(nodes.items)
 
-        # For demonstration purposes, print the pod information
-        print(json.dumps(pod_info))
+if __name__ == "__main__":
+    # Replace 'cc-ndc-eks-cluster-dev-cluster' with your actual EKS cluster name
+    cluster_name = 'cc-ndc-eks-cluster-dev-cluster'
 
-        return {
-            'statusCode': 200,
-            'body': json.dumps(pod_info)
-        }
+    # Get EKS cluster endpoint
+    cluster_endpoint = get_eks_cluster_endpoint(cluster_name)
 
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'body': f'Error: {str(e)}'
-        }
+    # Get details for running pods from Kubernetes API
+    running_pod_details = get_running_pod_details()
 
-# Uncomment the next two lines if you want to create the CloudWatch Events rule during the Lambda function deployment
-# lambda_function_name = 'your-lambda-function-name'
-# create_cloudwatch_event_rule(lambda_function_name)
-￼Enter
+    # Get the count of nodes in the EKS cluster
+    nodes_count = get_nodes_count()
+
+    # Print the information
+    print(f'EKS Cluster Endpoint: {cluster_endpoint}')
+    print('Running Pod Details:')
+    for pod in running_pod_details:
+        print(f'  Namespace: {pod["Namespace"]}')
+        print(f'  Name: {pod["Name"]}')
+        print(f'  Ready: {pod["Ready"]}')
+        print(f'  Status: {pod["Status"]}')
+    print(f'Number of Nodes in the Cluster: {nodes_count}')
