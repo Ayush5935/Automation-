@@ -75,3 +75,67 @@ def lambda_handler(event, context):
 
 # Uncomment the line below to test the lambda locally
 # lambda_handler(None, None)
+
+
+
+
+
+import os
+import boto3
+import json
+import uuid
+
+def get_eks_cluster_endpoint(cluster_name):
+    eks_client = boto3.client('eks')
+    response = eks_client.describe_cluster(name=cluster_name)
+    return response['cluster']['endpoint']
+
+def get_running_pod_details(cluster_name):
+    eks_client = boto3.client('eks')
+    response = eks_client.list_pod_executions(
+        clusterName=cluster_name,
+        status='SUCCEEDED'  # Adjust based on your requirements
+    )
+
+    running_pod_details = []
+
+    for execution in response['executions']:
+        running_pod_details.append({
+            'Namespace': execution['namespace'],
+            'Name': execution['podName'],
+            'Ready': True,  # Replace with your logic to determine readiness
+            'Status': 'Running',  # Replace with actual status
+        })
+
+    return running_pod_details
+
+def assume_role_and_update_dynamodb(cluster_name, running_pod_details):
+    # The rest of your existing logic remains unchanged
+    # ...
+
+def lambda_handler(event, context):
+    try:
+        cluster_name = 'cc-ndc-eks-cluster-dev-cluster'
+        cluster_endpoint = get_eks_cluster_endpoint(cluster_name)
+        running_pod_details = get_running_pod_details(cluster_name)
+
+        assume_role_and_update_dynamodb(cluster_name, running_pod_details)
+
+        print('Running Pod Details:')
+        for pod in running_pod_details:
+            print(f' Namespace: {pod["Namespace"]}')
+            print(f' Name: {pod["Name"]}')
+            print(f' Ready: {pod["Ready"]}')
+            print(f' Status: {pod["Status"]}')
+            print("----------")
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'ClusterEndpoint': cluster_endpoint, 'RunningPodDetails': running_pod_details})
+        }
+    except Exception as e:
+        print(f"Error in lambda_handler: {e}")
+        raise
+
+# Uncomment the line below to test the lambda locally
+# lambda_handler(None, None)
