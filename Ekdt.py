@@ -9,22 +9,17 @@ def get_eks_cluster_endpoint(cluster_name):
     response = eks_client.describe_cluster(name=cluster_name)
     return response['cluster']['endpoint']
 
-def get_running_pod_details():
+def get_running_twistlock_pods():
     config.load_kube_config()
     k8s_api = client.CoreV1Api()
     pods = k8s_api.list_pod_for_all_namespaces()
-    running_pod_details = []
+    twistlock_running_pods = []
 
     for pod in pods.items:
         if pod.status.phase == 'Running' and pod.metadata.namespace == 'twistlock':
-            running_pod_details.append({
-                'Namespace': pod.metadata.namespace,
-                'Name': pod.metadata.name,
-                'Ready': pod.status.container_statuses[0].ready if pod.status.container_statuses else None,
-                'Status': pod.status.phase,
-            })
+            twistlock_running_pods.append(pod.metadata.name)
 
-    return running_pod_details
+    return twistlock_running_pods
 
 def get_nodes_count():
     config.load_kube_config()
@@ -32,7 +27,7 @@ def get_nodes_count():
     nodes = k8s_api.list_node()
     return len(nodes.items)
 
-def assume_role_and_update_dynamodb(cluster_name, running_pod_details, nodes_count):
+def assume_role_and_update_dynamodb(cluster_name, is_ok, nodes_count):
     assume_role_arn = 'arn:aws:iam::155880749572:role/5g-defender-installation-automation'
     sts_client = boto3.client('sts')
     assumed_role = sts_client.assume_role(
@@ -52,9 +47,8 @@ def assume_role_and_update_dynamodb(cluster_name, running_pod_details, nodes_cou
 
     response = table.update_item(
         Key={'id': unique_id, 'eksClusterName': cluster_name},
-        UpdateExpression='SET IsEqual = :is_equal, RunningPodDetails = :pod_details, NodesCount = :nodes_count',
-        ExpressionAttributeValues={':is_equal': len(running_pod_details) == nodes_count,
-                                    ':pod_details': running_pod_details,
+        UpdateExpression='SET IsOK = :is_ok, NodesCount = :nodes_count',
+        ExpressionAttributeValues={':is_ok': is_ok,
                                     ':nodes_count': nodes_count},
         ReturnValues='ALL_NEW'
     )
@@ -66,23 +60,20 @@ def lambda_handler(event, context):
     try:
         cluster_name = 'cc-ndc-eks-cluster-dev-cluster'
         cluster_endpoint = get_eks_cluster_endpoint(cluster_name)
-        running_pod_details = get_running_pod_details()
+        twistlock_running_pods = get_running_twistlock_pods()
         nodes_count = get_nodes_count()
 
-        assume_role_and_update_dynamodb(cluster_name, running_pod_details, nodes_count)
+        is_ok = len(twistlock_running_pods) > 0 and len(twistlock_running_pods) == nodes_count
+
+        assume_role_and_update_dynamodb(cluster_name, is_ok, nodes_count)
 
         print(f'Number of Nodes in the Cluster: {nodes_count}')
-        print('Running Pod Details:')
-        for pod in running_pod_details:
-            print(f' Namespace: {pod["Namespace"]}')
-            print(f' Name: {pod["Name"]}')
-            print(f' Ready: {pod["Ready"]}')
-            print(f' Status: {pod["Status"]}')
-            print("----------")
+        print(f'Twistlock Pods Running: {twistlock_running_pods}')
+        print("----------")
 
         return {
             'statusCode': 200,
-            'body': json.dumps({'ClusterEndpoint': cluster_endpoint, 'RunningPodDetails': running_pod_details, 'NodesCount': nodes_count})
+            'body': json.dumps({'ClusterEndpoint': cluster_endpoint, 'IsOK': is_ok, 'NodesCount': nodes_count})
         }
     except Exception as e:
         print(f"Error in lambda_handler: {e}")
@@ -90,4 +81,3 @@ def lambda_handler(event, context):
 
 # Uncomment the line below to test the lambda locally
 # lambda_handler(None, None)
-￼Enter
