@@ -32,7 +32,7 @@ def get_nodes_count():
     nodes = k8s_api.list_node()
     return len(nodes.items)
 
-def assume_role_and_update_dynamodb(cluster_name, running_pod_details):
+def assume_role_and_update_dynamodb(cluster_name, running_pod_details, nodes_count):
     assume_role_arn = 'arn:aws:iam::155880749572:role/5g-defender-installation-automation'
     sts_client = boto3.client('sts')
     assumed_role = sts_client.assume_role(
@@ -47,13 +47,15 @@ def assume_role_and_update_dynamodb(cluster_name, running_pod_details):
     table_name = 'twistlock-defender-cluster-version'
     table = dynamodb.Table(table_name)
 
-    unique_id = '670cd21b-4a42-11ee-9d3c-5feaf422a957'  # Use your logic to generate a unique ID
+    unique_id = str(uuid.uuid4())
     print(f'Updating DynamoDb item with id {unique_id} and eksclustername {cluster_name}')
 
     response = table.update_item(
         Key={'id': unique_id, 'eksClusterName': cluster_name},
-        UpdateExpression='SET IsEqual = :val, RunningPodDetails = :pod_details',
-        ExpressionAttributeValues={':val': True, ':pod_details': running_pod_details},
+        UpdateExpression='SET IsEqual = :is_equal, RunningPodDetails = :pod_details, NodesCount = :nodes_count',
+        ExpressionAttributeValues={':is_equal': len(running_pod_details) == nodes_count,
+                                    ':pod_details': running_pod_details,
+                                    ':nodes_count': nodes_count},
         ReturnValues='ALL_NEW'
     )
 
@@ -66,9 +68,8 @@ def lambda_handler(event, context):
         cluster_endpoint = get_eks_cluster_endpoint(cluster_name)
         running_pod_details = get_running_pod_details()
         nodes_count = get_nodes_count()
-        is_equal = len(running_pod_details) == nodes_count
 
-        assume_role_and_update_dynamodb(cluster_name, running_pod_details)
+        assume_role_and_update_dynamodb(cluster_name, running_pod_details, nodes_count)
 
         print(f'Number of Nodes in the Cluster: {nodes_count}')
         print('Running Pod Details:')
@@ -89,3 +90,4 @@ def lambda_handler(event, context):
 
 # Uncomment the line below to test the lambda locally
 # lambda_handler(None, None)
+￼Enter
