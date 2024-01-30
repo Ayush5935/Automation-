@@ -19,6 +19,9 @@ def generate_ec2_eni_graph(account_id, region):
                 nodes.add(eni_id)
                 edges.append(f'{instance_id} -> {eni_id};')
 
+    print("Generated DOT Code:")
+    print(generate_dot_code(nodes, edges))
+
     dot_code = generate_dot_code(nodes, edges)
     graph = graphviz.Source(dot_code)
     graph.render(filename="ec2_eni_graph", format="png", cleanup=True, view=True)
@@ -37,4 +40,3 @@ def generate_dot_code(nodes, edges):
 
 # Example usage
 generate_ec2_eni_graph("your_account_id", "your_region")
-￼Enter
