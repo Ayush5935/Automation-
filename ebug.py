@@ -3,7 +3,7 @@ def generate_aws_network_graph(eni_details, subnet_details, route_table_details,
     elements = []
 
     # Extracting details for nodes
-    eni_id = eni_details[0]['NetworkInterfaceId'] if eni_details else ''
+    eni_id = eni_details[0]['NetworkInterfaceId'] if eni_details and eni_details[0].get('NetworkInterfaces') else ''
     
     if subnet_details and 'Subnets' in subnet_details:
         subnet_id = subnet_details['Subnets'][0]['SubnetId'] if subnet_details['Subnets'] else ''
@@ -21,36 +21,34 @@ def generate_aws_network_graph(eni_details, subnet_details, route_table_details,
         tgw_id = tgw_details['TransitGateways'][0]['TransitGatewayId'] if tgw_details['TransitGateways'] else ''
         
         # Add Transit Gateway as a node
-        elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway\n{tgw_id}'}})
+        elements.append({'data': {'id': tgw_id, 'label': f'Transit Gateway\n{tgw_id}'}})
         
         # Add Transit Gateway attachments as separate nodes
         for attachment in tgw_attachments:
             attachment_id = attachment.get('TransitGatewayAttachmentId', '')
             elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
-            elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
+            elements.append({'data': {'source': tgw_id, 'target': attachment_id}})
+            
+            # Add Transit Gateway Route Table as a node
+            tgw_route_table_id = attachment.get('TransitGatewayRouteTableId', '')
+            elements.append({'data': {'id': tgw_route_table_id, 'label': f'TGW Route Table\n{tgw_route_table_id}'}})
+            elements.append({'data': {'source': attachment_id, 'target': tgw_route_table_id}})
     else:
         tgw_id = ''
 
     # Example: Add nodes and edges based on fetched data
-    elements.append({'data': {'id': 'source', 'label': 'Source'}})
-    elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_id}'}})
-    elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_id}'}})
-    elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_id}'}})
+    elements.append({'data': {'id': eni_id, 'label': f'ENI\n{eni_id}'}})
+    elements.append({'data': {'id': subnet_id, 'label': f'Subnet\n{subnet_id}'}})
+    elements.append({'data': {'id': route_table_id, 'label': f'Route Table\n{route_table_id}'}})
     elements.append({'data': {'id': 'destination', 'label': destination_ipv4}})
 
     # Add edges based on the availability of data
-    if eni_id:
-        elements.append({'data': {'source': 'source', 'target': 'eni'}})
-
-    if subnet_id:
-        elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
-
-    if route_table_id:
-        elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
-        elements.append({'data': {'source': 'route_table', 'target': 'destination'}})
+    elements.append({'data': {'source': eni_id, 'target': subnet_id}})
+    elements.append({'data': {'source': subnet_id, 'target': route_table_id}})
+    elements.append({'data': {'source': route_table_id, 'target': 'destination'}})
 
     if tgw_id:
-        elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
+        elements.append({'data': {'source': route_table_id, 'target': tgw_id}})
 
     # Create the Dash app
     app = dash.Dash(__name__)
