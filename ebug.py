@@ -1,59 +1,36 @@
-def generate_aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments):
-    # Logic to process fetched data and generate graph using Dash Cytoscape
+import argparse
+import boto3
+import dash
+from dash import html
+from dash_cytoscape import Cytoscape
+
+def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
+    # Your existing function to fetch AWS data
+    # ...
+
+def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments):
     elements = []
 
-    # Extracting details for nodes
-    eni_id = eni_details[0]['NetworkInterfaceId'] if eni_details and eni_details[0].get('NetworkInterfaces') else ''
-    
-    if subnet_details and 'Subnets' in subnet_details:
-        subnet_id = subnet_details['Subnets'][0]['SubnetId'] if subnet_details['Subnets'] else ''
-    else:
-        subnet_id = ''
-    
-    if route_table_details and 'RouteTables' in route_table_details:
-        route_table_id = route_table_details['RouteTables'][0]['RouteTableId'] if route_table_details['RouteTables'] else ''
-    else:
-        route_table_id = ''
-    
-    destination_ipv4 = 'Destination\n'  # Add your logic to fetch the destination IPv4
+    # Add nodes with unique IDs
+    elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_details[0]["label"]}'}})
+    elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_details[0]["label"]}'}})
+    elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_details[0]["label"]}'}})
+    elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway\n{tgw_details[0]["label"]}'}})
+    elements.append({'data': {'id': 'tgw_rtb', 'label': 'Transit Gateway Route Table'}})
 
-    if tgw_details and 'TransitGateways' in tgw_details:
-        tgw_id = tgw_details['TransitGateways'][0]['TransitGatewayId'] if tgw_details['TransitGateways'] else ''
-        
-        # Add Transit Gateway as a node
-        elements.append({'data': {'id': tgw_id, 'label': f'Transit Gateway\n{tgw_id}'}})
-        
-        # Add Transit Gateway attachments as separate nodes
-        for attachment in tgw_attachments:
-            attachment_id = attachment.get('TransitGatewayAttachmentId', '')
-            elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
-            elements.append({'data': {'source': tgw_id, 'target': attachment_id}})
-            
-            # Add Transit Gateway Route Table as a node
-            tgw_route_table_id = attachment.get('TransitGatewayRouteTableId', '')
-            elements.append({'data': {'id': tgw_route_table_id, 'label': f'TGW Route Table\n{tgw_route_table_id}'}})
-            elements.append({'data': {'source': attachment_id, 'target': tgw_route_table_id}})
-    else:
-        tgw_id = ''
+    # Add Transit Gateway attachments as separate nodes
+    for attachment in tgw_attachments:
+        attachment_id = f"attachment_{attachment['TransitGatewayAttachmentId']}"
+        elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
+        elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
 
-    # Example: Add nodes and edges based on fetched data
-    elements.append({'data': {'id': eni_id, 'label': f'ENI\n{eni_id}'}})
-    elements.append({'data': {'id': subnet_id, 'label': f'Subnet\n{subnet_id}'}})
-    elements.append({'data': {'id': route_table_id, 'label': f'Route Table\n{route_table_id}'}})
-    elements.append({'data': {'id': 'destination', 'label': destination_ipv4}})
+    elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
+    elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
+    elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
+    elements.append({'data': {'source': 'tgw', 'target': 'attachment_'}})  # Connect to any attachment
+    elements.append({'data': {'source': 'tgw', 'target': 'tgw_rtb'}})
 
-    # Add edges based on the availability of data
-    elements.append({'data': {'source': eni_id, 'target': subnet_id}})
-    elements.append({'data': {'source': subnet_id, 'target': route_table_id}})
-    elements.append({'data': {'source': route_table_id, 'target': 'destination'}})
-
-    if tgw_id:
-        elements.append({'data': {'source': route_table_id, 'target': tgw_id}})
-
-    # Create the Dash app
     app = dash.Dash(__name__)
-
-    # Define the layout
     app.layout = html.Div([
         Cytoscape(
             id='graph',
@@ -69,10 +46,8 @@ def generate_aws_network_graph(eni_details, subnet_details, route_table_details,
                         'border-color': '#3573A5',
                         'border-width': 2,
                         'font-size': '12px',
-                        'width': '100px',
+                        'width': '100px',  # Adjust width for better readability
                         'height': '50px',
-                        'text-valign': 'center',
-                        'text-halign': 'center',
                     }
                 },
                 {
@@ -102,4 +77,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
-    generate_aws_network_graph(*aws_data)
+    aws_network_graph(*aws_data)
