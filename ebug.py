@@ -12,22 +12,24 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
     elements = []
 
     # Add nodes with unique IDs
-    elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_details[0]["label"]}'}})
-    elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_details[0]["label"]}'}})
-    elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_details[0]["label"]}'}})
-    elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway\n{tgw_details[0]["label"]}'}})
-    elements.append({'data': {'id': 'tgw_rtb', 'label': 'Transit Gateway Route Table'}})
+    eni_id = eni_details[0]["label"]
+    subnet_id = subnet_details[0]["label"]
+    route_table_id = route_table_details[0]["label"]
+    tgw_id = tgw_details[0]["label"]
+    tgw_attachment_id = tgw_attachments[0]["TransitGatewayAttachmentId"]
 
-    # Add Transit Gateway attachments as separate nodes
-    for attachment in tgw_attachments:
-        attachment_id = f"attachment_{attachment['TransitGatewayAttachmentId']}"
-        elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
-        elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
-        elements.append({'data': {'source': attachment_id, 'target': 'tgw_rtb'}})
+    elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_id}'}})
+    elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_id}'}})
+    elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_id}'}})
+    elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway\n{tgw_id}'}})
+    elements.append({'data': {'id': 'tgw_rtb', 'label': f'{tgw_id} Route Table\n{tgw_id}-rtb-079xx'}})
+    elements.append({'data': {'id': 'tgw_attachment', 'label': f'Transit Gateway Attachment\n{tgw_attachment_id}'}})
 
     elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
     elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
     elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
+    elements.append({'data': {'source': 'tgw', 'target': 'tgw_attachment'}})
+    elements.append({'data': {'source': 'tgw_attachment', 'target': 'tgw_rtb'}})
 
     app = dash.Dash(__name__)
     app.layout = html.Div([
@@ -45,7 +47,7 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
                         'border-color': '#3573A5',
                         'border-width': 2,
                         'font-size': '12px',
-                        'width': '100px',  # Adjust width for better readability
+                        'width': '100px',
                         'height': '50px',
                     }
                 },
