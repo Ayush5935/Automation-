@@ -23,12 +23,11 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
         attachment_id = f"attachment_{attachment['TransitGatewayAttachmentId']}"
         elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
         elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
+        elements.append({'data': {'source': attachment_id, 'target': 'tgw_rtb'}})
 
     elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
     elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
     elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
-    elements.append({'data': {'source': 'tgw', 'target': 'attachment_'}})  # Connect to any attachment
-    elements.append({'data': {'source': 'tgw', 'target': 'tgw_rtb'}})
 
     app = dash.Dash(__name__)
     app.layout = html.Div([
