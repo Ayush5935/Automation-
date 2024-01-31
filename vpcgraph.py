@@ -1,67 +1,55 @@
-import dash
-from dash import html
-from dash_cytoscape import Cytoscape
-import boto3
 import argparse
+import boto3
+import dash
+from dash import html, dcc
+from dash.dependencies import Input, Output
+from dash_cytoscape import Cytoscape
 
-def generate_aws_network_graph(account_id, region):
+def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
     # Connect to AWS using Boto3
     session = boto3.Session(
         aws_access_key_id='your_access_key',
         aws_secret_access_key='your_secret_key',
         region_name=region
     )
-    
+
     ec2_client = session.client('ec2')
 
-    # Fetch VPCs
-    vpcs = ec2_client.describe_vpcs()['Vpcs']
+    # Fetch data from AWS based on user selections
+    # Replace the placeholder logic with actual AWS API calls
 
+    # Example: Fetch ENI details
+    eni_details = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[eni])
+
+    # Example: Fetch Subnet details
+    subnet_details = ec2_client.describe_subnets(SubnetIds=[subnet])
+
+    # Example: Fetch Route Table details
+    route_table_details = ec2_client.describe_route_tables(RouteTableIds=[route_table])
+
+    # Example: Fetch Transit Gateway details
+    tgw_details = ec2_client.describe_transit_gateways(TransitGatewayIds=[tgw])
+
+    return eni_details, subnet_details, route_table_details, tgw_details
+
+def generate_aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details):
+    # Logic to process fetched data and generate graph using Dash Cytoscape
     elements = []
 
-    for vpc in vpcs:
-        vpc_id = vpc['VpcId']
-        elements.append({'data': {'id': vpc_id, 'label': f'VPC {vpc_id}'}})
+    # Example: Add nodes and edges based on fetched data
+    elements.append({'data': {'id': 'source', 'label': 'Source'}})
+    elements.append({'data': {'id': 'eni', 'label': 'ENI'}})
+    elements.append({'data': {'id': 'subnet', 'label': 'Subnet'}})
+    elements.append({'data': {'id': 'route_table', 'label': 'Route Table'}})
+    elements.append({'data': {'id': 'destination', 'label': 'Destination'}})
+    elements.append({'data': {'id': 'tgw', 'label': 'Transit Gateway'}})
 
-        # Fetch Subnets
-        subnets = ec2_client.describe_subnets(Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])['Subnets']
-        for subnet in subnets:
-            subnet_id = subnet['SubnetId']
-            elements.append({'data': {'id': subnet_id, 'label': f'Subnet {subnet_id}'}})
-            elements.append({'data': {'source': vpc_id, 'target': subnet_id}})
+    elements.append({'data': {'source': 'source', 'target': 'eni'}})
+    elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
+    elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
+    elements.append({'data': {'source': 'route_table', 'target': 'destination'}})
+    elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
 
-        # Fetch Route Tables
-        route_tables = ec2_client.describe_route_tables(Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])['RouteTables']
-        for route_table in route_tables:
-            route_table_id = route_table['RouteTableId']
-            elements.append({'data': {'id': route_table_id, 'label': f'Route Table {route_table_id}'}})
-            elements.append({'data': {'source': vpc_id, 'target': route_table_id}})
-
-            # Fetch Route Table Entries
-            for route in route_table['Routes']:
-                destination_cidr = route.get('DestinationCidrBlock', '')
-                if destination_cidr:
-                    elements.append({'data': {'id': destination_cidr, 'label': f'Destination: {destination_cidr}'}})
-                    elements.append({'data': {'source': route_table_id, 'target': destination_cidr}})
-
-            # Fetch Route Table Associations (Subnets)
-            associations = route_table.get('Associations', [])
-            for association in associations:
-                subnet_id = association.get('SubnetId', '')
-                if subnet_id:
-                    elements.append({'data': {'source': subnet_id, 'target': route_table_id}})
-
-            # Fetch Route Table Attachments (Transit Gateway)
-            attachments = route_table.get('Associations', [])
-            for attachment in attachments:
-                attachment_id = attachment.get('TransitGatewayAttachmentId', '')
-                if attachment_id:
-                    elements.append({'data': {'id': attachment_id, 'label': f'Attachment {attachment_id}'}})
-                    elements.append({'data': {'source': vpc_id, 'target': attachment_id}})
-
-    return elements
-
-def create_dash_app(elements):
     # Create the Dash app
     app = dash.Dash(__name__)
 
@@ -77,13 +65,12 @@ def create_dash_app(elements):
                     'selector': 'node',
                     'style': {
                         'content': 'data(label)',
-                        'background-fit': 'cover',
-                        'background-color': '#ffffff',
+                        'background-color': '#6FB1FC',
                         'border-color': '#3573A5',
                         'border-width': 2,
                         'font-size': '12px',
-                        'width': '100px',
-                        'height': '100px',
+                        'width': '50px',
+                        'height': '50px',
                     }
                 },
                 {
@@ -98,14 +85,19 @@ def create_dash_app(elements):
         )
     ])
 
-    return app
+    app.run_server(debug=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate and visualize AWS network graph.')
     parser.add_argument('--account', help='AWS account ID', required=True)
     parser.add_argument('--region', help='AWS region', required=True)
+    parser.add_argument('--ipv4', help='Source Private IPv4', required=True)
+    parser.add_argument('--eni', help='Source ENI', required=True)
+    parser.add_argument('--subnet', help='Source Subnet ID', required=True)
+    parser.add_argument('--route-table', help='Source Route Table ID', required=True)
+    parser.add_argument('--destination-ipv4', help='Destination Private IPv4', required=True)
+    parser.add_argument('--tgw', help='Source TGW', required=True)
     args = parser.parse_args()
 
-    graph_elements = generate_aws_network_graph(account_id=args.account, region=args.region)
-    app = create_dash_app(graph_elements)
-    app.run_server(debug=True)
+    aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
+    generate_aws_network_graph(*aws_data)
