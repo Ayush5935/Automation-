@@ -1,35 +1,50 @@
 import argparse
 import boto3
 import dash
-from dash import html
+from dash import html, dcc
+from dash.dependencies import Input, Output
 from dash_cytoscape import Cytoscape
 
 def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
-    # Your existing function to fetch AWS data
-    # ...
+    session = boto3.Session(region_name=region)
+    ec2_client = session.client('ec2')
+
+    eni_details = [{'label': eni['NetworkInterfaceId'], 'value': eni['NetworkInterfaceId']} for eni in ec2_client.describe_network_interfaces()['NetworkInterfaces']]
+    subnet_details = [{'label': subnet['SubnetId'], 'value': subnet['SubnetId']} for subnet in ec2_client.describe_subnets()['Subnets']]
+    route_table_details = [{'label': rt['RouteTableId'], 'value': rt['RouteTableId']} for rt in ec2_client.describe_route_tables()['RouteTables']]
+    tgw_details = [{'label': tgw['TransitGatewayId'], 'value': tgw['TransitGatewayId']} for tgw in ec2_client.describe_transit_gateways()['TransitGateways']]
+    tgw_attachments = ec2_client.describe_transit_gateway_attachments(Filters=[{'Name': 'transit-gateway-id', 'Values': [tgw]}])['TransitGatewayAttachments']
+
+    return eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments
+
+def extract_tgw_rtb_id(tgw_attachment_id, ec2_client):
+    attachment_details = ec2_client.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[tgw_attachment_id]).get('TransitGatewayAttachments', [])
+
+    if attachment_details:
+        tgw_rtb_id = attachment_details[0].get('Association', {}).get('TransitGatewayRouteTableId', '')
+        return tgw_rtb_id
+
+    return None
 
 def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments):
     elements = []
 
-    # Add nodes with unique IDs
-    eni_id = eni_details[0]["label"]
-    subnet_id = subnet_details[0]["label"]
-    route_table_id = route_table_details[0]["label"]
-    tgw_id = tgw_details[0]["label"]
-    tgw_attachment_id = tgw_attachments[0]["TransitGatewayAttachmentId"]
+    elements.append({'data': {'id': 'eni', 'label': 'ENI'}})
+    elements.append({'data': {'id': 'subnet', 'label': 'Subnet'}})
+    elements.append({'data': {'id': 'route_table', 'label': 'Route Table'}})
+    elements.append({'data': {'id': 'tgw', 'label': 'Transit Gateway'}})
 
-    elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_id}'}})
-    elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_id}'}})
-    elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_id}'}})
-    elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway\n{tgw_id}'}})
-    elements.append({'data': {'id': 'tgw_rtb', 'label': f'{tgw_id} Route Table\n{tgw_id}-rtb-079xx'}})
-    elements.append({'data': {'id': 'tgw_attachment', 'label': f'Transit Gateway Attachment\n{tgw_attachment_id}'}})
-
+    for attachment in tgw_attachments:
+        attachment_id = attachment['TransitGatewayAttachmentId']
+        tgw_rtb_id = extract_tgw_rtb_id(attachment_id, ec2_client)
+        
+        elements.append({'data': {'id': attachment_id, 'label': f'Attachment \n{attachment_id}'}})
+        elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
+        elements.append({'data': {'source': attachment_id, 'target': tgw_rtb_id}})
+    
     elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
     elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
     elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
-    elements.append({'data': {'source': 'tgw', 'target': 'tgw_attachment'}})
-    elements.append({'data': {'source': 'tgw_attachment', 'target': 'tgw_rtb'}})
 
     app = dash.Dash(__name__)
     app.layout = html.Div([
@@ -47,7 +62,7 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
                         'border-color': '#3573A5',
                         'border-width': 2,
                         'font-size': '12px',
-                        'width': '100px',
+                        'width': '50px',
                         'height': '50px',
                     }
                 },
@@ -77,5 +92,6 @@ if __name__ == '__main__':
     parser.add_argument('--tgw', help='Source TGW', required=True)
     args = parser.parse_args()
 
+    ec2_client = boto3.client('ec2', region_name=args.region)
     aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
     aws_network_graph(*aws_data)
