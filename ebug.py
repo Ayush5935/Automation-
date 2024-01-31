@@ -3,32 +3,39 @@ def generate_aws_network_graph(eni_details, subnet_details, route_table_details,
     elements = []
 
     # Extracting details for nodes
-    if eni_details:
-        eni_id = eni_details[0].get('NetworkInterfaceId', '')
-        elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_id}'}})
-
-    if subnet_details['Subnets']:
-        subnet_id = subnet_details['Subnets'][0].get('SubnetId', '')
-        elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_id}'}})
-
-    if route_table_details['RouteTables']:
-        route_table_id = route_table_details['RouteTables'][0].get('RouteTableId', '')
-        elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_id}'}})
-
+    eni_id = eni_details[0]['NetworkInterfaceId'] if eni_details else ''
+    
+    if subnet_details and 'Subnets' in subnet_details:
+        subnet_id = subnet_details['Subnets'][0]['SubnetId'] if subnet_details['Subnets'] else ''
+    else:
+        subnet_id = ''
+    
+    if route_table_details and 'RouteTables' in route_table_details:
+        route_table_id = route_table_details['RouteTables'][0]['RouteTableId'] if route_table_details['RouteTables'] else ''
+    else:
+        route_table_id = ''
+    
     destination_ipv4 = 'Destination\n'  # Add your logic to fetch the destination IPv4
 
-    if tgw_details['TransitGateways']:
-        tgw_id = tgw_details['TransitGateways'][0].get('TransitGatewayId', '')
+    if tgw_details and 'TransitGateways' in tgw_details:
+        tgw_id = tgw_details['TransitGateways'][0]['TransitGatewayId'] if tgw_details['TransitGateways'] else ''
+        
+        # Add Transit Gateway as a node
         elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway\n{tgw_id}'}})
-
+        
         # Add Transit Gateway attachments as separate nodes
         for attachment in tgw_attachments:
             attachment_id = attachment.get('TransitGatewayAttachmentId', '')
             elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
             elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
+    else:
+        tgw_id = ''
 
     # Example: Add nodes and edges based on fetched data
     elements.append({'data': {'id': 'source', 'label': 'Source'}})
+    elements.append({'data': {'id': 'eni', 'label': f'ENI\n{eni_id}'}})
+    elements.append({'data': {'id': 'subnet', 'label': f'Subnet\n{subnet_id}'}})
+    elements.append({'data': {'id': 'route_table', 'label': f'Route Table\n{route_table_id}'}})
     elements.append({'data': {'id': 'destination', 'label': destination_ipv4}})
 
     # Add edges based on the availability of data
@@ -98,4 +105,3 @@ if __name__ == '__main__':
 
     aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
     generate_aws_network_graph(*aws_data)
-￼Enter
