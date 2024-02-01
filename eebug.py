@@ -43,56 +43,47 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
                     'selector': 'node',
                     'style': {
                         'content': 'data(label)',
-                        'border-color': '#fff',
-                        'border-width': 2,
                         'font-size': '12px',
                         'width': '100px',
                         'height': '100px',
+                        'shape': 'ellipse',
+                        'text-halign': 'center',
+                        'text-valign': 'center',
                     }
                 },
                 {
                     'selector': '[type = "ENI"]',
                     'style': {
-                        'background-color': '#6FB1FC',
-                        'background-image': 'url(https://img.icons8.com/ios-filled/50/000000/network-card.png)',
-                        'background-fit': 'cover',
-                        'shape': 'ellipse',
+                        'background-color': '#6FB1FC',  # Blue
+                        'border-color': '#3573A5',
                     }
                 },
                 {
                     'selector': '[type = "Subnet"]',
                     'style': {
-                        'background-color': '#98FB98',
-                        'background-image': 'url(https://img.icons8.com/ios-filled/50/000000/subnet.png)',
-                        'background-fit': 'cover',
-                        'shape': 'ellipse',
+                        'background-color': '#98FB98',  # Green
+                        'border-color': '#4CAF50',
                     }
                 },
                 {
                     'selector': '[type = "Route Table"]',
                     'style': {
-                        'background-color': '#FFD700',
-                        'background-image': 'url(https://img.icons8.com/ios-filled/50/000000/route.png)',
-                        'background-fit': 'cover',
-                        'shape': 'ellipse',
+                        'background-color': '#FFD700',  # Yellow
+                        'border-color': '#FFC107',
                     }
                 },
                 {
                     'selector': '[type = "Transit Gateway"]',
                     'style': {
-                        'background-color': '#FF6347',
-                        'background-image': 'url(https://img.icons8.com/ios-filled/50/000000/cloud-network.png)',
-                        'background-fit': 'cover',
-                        'shape': 'ellipse',
+                        'background-color': '#FF6347',  # Red
+                        'border-color': '#E57373',
                     }
                 },
                 {
                     'selector': '[type = "Transit Gateway Attachment"]',
                     'style': {
-                        'background-color': '#8A2BE2',
-                        'background-image': 'url(https://img.icons8.com/ios-filled/50/000000/link.png)',
-                        'background-fit': 'cover',
-                        'shape': 'ellipse',
+                        'background-color': '#8A2BE2',  # Purple
+                        'border-color': '#7B1FA2',
                     }
                 },
                 {
