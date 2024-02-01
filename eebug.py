@@ -1,56 +1,37 @@
 import argparse
 import boto3
 import dash
-from dash import html
+from dash import html, dcc
+from dash.dependencies import Input, Output
 from dash_cytoscape import Cytoscape
 
 def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
     session = boto3.Session(region_name=region)
     ec2_client = session.client('ec2')
 
-    eni_details = [{'label': eni['NetworkInterfaceId'], 'value': eni['NetworkInterfaceId']} for eni in ec2_client.describe_network_interfaces()['NetworkInterfaces']]
-    subnet_details = [{'label': subnet['SubnetId'], 'value': subnet['SubnetId']} for subnet in ec2_client.describe_subnets()['Subnets']]
-    route_table_details = [{'label': rt['RouteTableId'], 'value': rt['RouteTableId']} for rt in ec2_client.describe_route_tables()['RouteTables']]
-    tgw_details = [{'label': tgw['TransitGatewayId'], 'value': tgw['TransitGatewayId']} for tgw in ec2_client.describe_transit_gateways()['TransitGateways']]
+    eni_details = [{'label': eni['NetworkInterfaceId'], 'value': eni['NetworkInterfaceId'], 'type': 'ENI', 'details': eni} for eni in ec2_client.describe_network_interfaces()['NetworkInterfaces']]
+    subnet_details = [{'label': subnet['SubnetId'], 'value': subnet['SubnetId'], 'type': 'Subnet', 'details': subnet} for subnet in ec2_client.describe_subnets()['Subnets']]
+    route_table_details = [{'label': rt['RouteTableId'], 'value': rt['RouteTableId'], 'type': 'Route Table', 'details': rt} for rt in ec2_client.describe_route_tables()['RouteTables']]
+    tgw_details = [{'label': tgw['TransitGatewayId'], 'value': tgw['TransitGatewayId'], 'type': 'Transit Gateway', 'details': tgw} for tgw in ec2_client.describe_transit_gateways()['TransitGateways']]
+    
     tgw_attachments = ec2_client.describe_transit_gateway_attachments(Filters=[{'Name': 'transit-gateway-id', 'Values': [tgw]}])['TransitGatewayAttachments']
+    tgw_attachments_details = [{'label': attachment['TransitGatewayAttachmentId'], 'value': attachment['TransitGatewayAttachmentId'], 'type': 'Transit Gateway Attachment', 'details': attachment} for attachment in tgw_attachments]
 
-    return eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments
+    return eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments_details
 
-def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments):
+def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments_details):
     elements = []
 
-    elements.append({'data': {'id': 'eni', 'label': 'ENI'}})
-    elements.append({'data': {'id': 'subnet', 'label': 'Subnet'}})
-    elements.append({'data': {'id': 'route_table', 'label': 'Route Table'}})
-    elements.append({'data': {'id': 'tgw', 'label': 'Transit Gateway'}})
+    for details_list in [eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments_details]:
+        for details in details_list:
+            node_id = f"{details['type']}_{details['label']}"
+            elements.append({'data': {'id': node_id, 'label': f"{details['type']} {details['label']}", 'info': details}})
 
-    for subnet in subnet_details:
-        subnet_id = subnet['value']
-        elements.append({'data': {'id': subnet_id, 'label': f'Subnet\n{subnet_id}'}})
-        elements.append({'data': {'source': 'eni', 'target': subnet_id}})
-    
-    for route_table in route_table_details:
-        rt_id = route_table['value']
-        elements.append({'data': {'id': rt_id, 'label': f'Route Table\n{rt_id}'}})
-        elements.append({'data': {'source': 'subnet', 'target': rt_id}})
-    
-    for tgw in tgw_details:
-        tgw_id = tgw['value']
-        elements.append({'data': {'id': tgw_id, 'label': f'Transit Gateway\n{tgw_id}'}})
-        elements.append({'data': {'source': 'route_table', 'target': tgw_id}})
-    
-    for attachment in tgw_attachments:
-        attachment_id = attachment['TransitGatewayAttachmentId']
-        elements.append({'data': {'id': attachment_id, 'label': f'Attachment\n{attachment_id}'}})
-        elements.append({'data': {'source': 'tgw', 'target': attachment_id}})
-        
-        # Extract Transit Gateway Route Table ID from Attachment
-        tgw_route_table_id = attachment.get('Association', {}).get('TransitGatewayRouteTableId', '')
-        if tgw_route_table_id:
-            elements.append({'data': {'id': tgw_route_table_id, 'label': f'TGW Route Table\n{tgw_route_table_id}'}})
-            elements.append({'data': {'source': attachment_id, 'target': tgw_route_table_id}})
-    
+    for link in [('eni', 'subnet'), ('subnet', 'route_table'), ('route_table', 'tgw'), ('tgw', 'tgw_attachment'), ('tgw_attachment', 'tgw_rtb')]:
+        elements.append({'data': {'source': link[0], 'target': link[1]}})
+
     app = dash.Dash(__name__)
+
     app.layout = html.Div([
         Cytoscape(
             id='graph',
@@ -66,8 +47,8 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
                         'border-color': '#3573A5',
                         'border-width': 2,
                         'font-size': '12px',
-                        'width': '50px',
-                        'height': '50px',
+                        'width': '100px',
+                        'height': '100px',
                     }
                 },
                 {
@@ -81,6 +62,20 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
             ]
         )
     ])
+
+    # Add callback to update the node information on click
+    @app.callback(
+        Output('node-info', 'children'),
+        [Input('graph', 'tapNode')]
+    )
+    def display_node_data(tap_node):
+        if tap_node:
+            node_id = tap_node['data']['id']
+            node_info = tap_node['data'].get('info')
+
+            if node_info:
+                formatted_info = "\n".join([f"{key}: {value}" for key, value in node_info['details'].items()])
+                return dcc.Markdown(f"Information about {node_id}:\n{formatted_info}")
 
     app.run_server(debug=True)
 
