@@ -12,7 +12,7 @@ stylesheet = [
         }
     },
     {
-        'selector': '[type = "ENI"]',
+        'selector': '#eni',
         'style': {
             'background-color': '#6FB1FC',  # Blue
             'border-color': '#3573A5',
@@ -23,7 +23,7 @@ stylesheet = [
         }
     },
     {
-        'selector': '[type = "Subnet"]',
+        'selector': '#subnet',
         'style': {
             'background-color': '#98FB98',  # Green
             'border-color': '#4CAF50',
@@ -34,7 +34,7 @@ stylesheet = [
         }
     },
     {
-        'selector': '[type = "Route Table"]',
+        'selector': '#route_table',
         'style': {
             'background-color': '#FFD700',  # Yellow
             'border-color': '#FFC107',
@@ -45,7 +45,7 @@ stylesheet = [
         }
     },
     {
-        'selector': '[type = "Transit Gateway"]',
+        'selector': '#tgw',
         'style': {
             'background-color': '#FF6347',  # Red
             'border-color': '#E57373',
@@ -56,7 +56,7 @@ stylesheet = [
         }
     },
     {
-        'selector': '[type = "Transit Gateway Attachment"]',
+        'selector': '#tgw_attachment',
         'style': {
             'background-color': '#8A2BE2',  # Purple
             'border-color': '#7B1FA2',
