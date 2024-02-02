@@ -5,7 +5,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output
 from dash_cytoscape import Cytoscape
 import dash_bootstrap_components as dbc
-from dash_iconify import Icon
+from dash_iconify import DashIconify
 
 def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
     # (Your existing code for fetching AWS data)
@@ -19,8 +19,7 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
     tgw_attachment_id = tgw_attachments[0]["TransitGatewayAttachmentId"]
     tgw_route_table_id = tgw_attachments[0]['Association'].get('TransitGatewayRouteTableId')
 
-    elements.append({'data': {'id': 'eni', 'label': f'ENI {eni_id}', 'type': 'ENI',
-                              'background-image': f'url({Icon("mdi-application", size="70%", color="white").as_component()})'}})
+    elements.append({'data': {'id': 'eni', 'label': f'ENI {eni_id}', 'type': 'ENI', 'icon': 'https://img.icons8.com/ios-filled/50/000000/aws.png'}})
     elements.append({'data': {'id': 'subnet', 'label': f'Subnet {subnet_id}'}})
     elements.append({'data': {'id': 'route_table', 'label': f'Route Table {route_table_id}'}})
     elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway {tgw_id}'}})
@@ -32,8 +31,7 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
     elements.append({'data': {'source': 'tgw', 'target': 'tgw_attachment'}})
     elements.append({'data': {'source': 'tgw_attachment', 'target': 'tgw_rtb'}})
 
-    BS = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
-    app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, BS])
+    app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
     app.layout = dbc.Container([
         dbc.Row([
@@ -48,7 +46,7 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
                     elements=elements,
                     stylesheet=[
                         {'selector': 'node', 'style': {'content': 'data(label)', 'font-size': '12px', 'width': '90px', 'height': '90px', 'shape': 'ellipse', 'text-halign': 'center', 'text-valign': 'bottom'}},
-                        {'selector': '#eni', 'style': {'background-image': f'url({Icon("mdi-application", size="70%", color="white").as_component()})', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%', 'border-color': '#3573A5'}},
+                        {'selector': '#eni', 'style': {'background-image': 'url(https://img.icons8.com/ios-filled/50/000000/aws.png)', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%', 'border-color': '#3573A5'}},
                         {'selector': '#subnet', 'style': {'background-color': '#98FB98', 'border-color': '#4CAF50'}},
                         {'selector': '#route_table', 'style': {'background-color': '#FFD700', 'border-color': '#FFC107'}},
                         {'selector': '#tgw', 'style': {'background-color': '#FF6347', 'border-color': '#E57373'}},
@@ -62,7 +60,13 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
         ]),
         dbc.Row([
             dbc.Col(
-                html.Div(id='node-info', className="mt-4")
+                DashIconify(
+                    icon="ion:logo-github",
+                    width=30,
+                    rotate=1,
+                    flip="horizontal",
+                ),
+                className="mt-4"
             )
         ])
     ])
@@ -82,9 +86,14 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate and visualize AWS network graph.')
-    # (Your existing code for argument parsing)
-
+    parser.add_argument('--account', help='AWS account ID', required=True)
+    parser.add_argument('--region', help='AWS region', required=True)
+    parser.add_argument('--ipv4', help='Source Private IPv4', required=True)
+    parser.add_argument('--eni', help='Source ENI', required=True)
+    parser.add_argument('--subnet', help='Source Subnet ID', required=True)
+    parser.add_argument('--route-table', help='Source Route Table ID', required=True)
+    parser.add_argument('--destination-ipv4', help='Destination Private IPv4', required=True)
+    parser.add_argument('--tgw', help='Source TGW', required=True)
     args = parser.parse_args()
-    aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table,
-                              args.destination_ipv4, args.tgw)
+    aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
     aws_network_graph(*aws_data)
