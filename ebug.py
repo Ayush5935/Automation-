@@ -1,77 +1,38 @@
-def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments_details):
+import argparse
+import boto3
+import dash
+from dash import html, dcc
+from dash.dependencies import Input, Output
+from dash_cytoscape import Cytoscape
+
+def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
+    # ... existing code ...
+
+def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments):
     elements = []
 
-    for details_list in [eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments_details]:
-        for details in details_list:
-            node_type = details.get('details', {}).get('type', 'Other')
-            node_id = f"{node_type}_{details['label']}"
-            elements.append({'data': {'id': node_id, 'label': f"{node_type} {details['label']}"}})
+    eni_id = eni_details[0]["label"]
+    subnet_id = subnet_details[0]["label"]
+    route_table_id = route_table_details[0]["label"]
+    tgw_id = tgw_details[0]["label"]
+    tgw_attachment_id = tgw_attachments[0]["TransitGatewayAttachmentId"]
+    tgw_route_table_id = tgw_attachments[0]['Association'].get('TransitGatewayRouteTableId')
 
-    for link in [('ENI', 'Subnet'), ('Subnet', 'Route Table'), ('Route Table', 'Transit Gateway'), ('Transit Gateway', 'Transit Gateway Attachment'), ('Transit Gateway Attachment', 'TGW RTB')]:
-        elements.append({'data': {'source': f"{link[0]}_{eni_details[0]['label']}", 'target': f"{link[1]}_{subnet_details[0]['label']}"}})
+    # Use real AWS icons for each node type
+    eni_icon_path = 'path/to/eni_icon.svg'  # Replace with actual path
+    subnet_icon_path = 'path/to/subnet_icon.svg'  # Replace with actual path
+    route_table_icon_path = 'path/to/route_table_icon.svg'  # Replace with actual path
+    tgw_icon_path = 'path/to/tgw_icon.svg'  # Replace with actual path
+    tgw_attachment_icon_path = 'path/to/tgw_attachment_icon.svg'  # Replace with actual path
 
-    app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+    elements.append({'data': {'id': 'eni', 'label': f'ENI {eni_id}', 'icon': eni_icon_path}})
+    elements.append({'data': {'id': 'subnet', 'label': f'Subnet {subnet_id}', 'icon': subnet_icon_path}})
+    elements.append({'data': {'id': 'route_table', 'label': f'Route Table {route_table_id}', 'icon': route_table_icon_path}})
+    elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway {tgw_id}', 'icon': tgw_icon_path}})
+    elements.append({'data': {'id': 'tgw_rtb', 'label': f'Tgw Route Table ID {tgw_route_table_id}', 'icon': tgw_icon_path}})
+    elements.append({'data': {'id': 'tgw_attachment', 'label': f'Transit Gateway Attachment {tgw_attachment_id}', 'icon': tgw_attachment_icon_path}})
 
-    app.layout = dbc.Container([
-        dbc.Row([
-            dbc.Col(html.H1("AWS Network Graph"), className="mb-4")
-        ]),
-        dbc.Row([
-            dbc.Col(
-                Cytoscape(
-                    id='graph',
-                    layout={'name': 'circle'},
-                    style={'width': '100%', 'height': '600px'},
-                    elements=elements,
-                    stylesheet=[
-                        {
-                            'selector': 'node',
-                            'style': {
-                                'content': 'data(label)',
-                                'font-size': '12px',
-                                'width': '90px',
-                                'height': '90px',
-                                'shape': 'ellipse',
-                                'text-halign': 'center',
-                                'text-valign': 'bottom',
-                                'background-color': 'gray',
-                                'border-color': 'black',
-                                'border-width': 2,
-                            }
-                        },
-                        {
-                            'selector': 'edge',
-                            'style': {
-                                'width': 3,
-                                'line-color': '#9DB5B2',
-                                'curve-style': 'bezier',
-                                'target-arrow-shape': 'triangle',
-                            }
-                        }
-                    ]
-                ),
-                width=12
-            )
-        ]),
-        dbc.Row([
-            dbc.Col(
-                html.Div(id='node-info', className="mt-4")
-            )
-        ])
-    ])
-
-    @app.callback(
-        Output('node-info', 'children'),
-        [Input('graph', 'tapNode')]
-    )
-    def display_node_data(tap_node):
-        if tap_node:
-            node_id = tap_node['data']['id']
-            node_info = f"Information about {node_id}:\n - ENI {eni_id} \n - Account {args.account} \n - Region {args.region} \n - IPv4 {args.ipv4}"
-            return dcc.Markdown(node_info)
-        return None
-
-    app.run_server(debug=True)
+    # ... existing code ...
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate and visualize AWS network graph.')
@@ -85,5 +46,6 @@ if __name__ == '__main__':
     parser.add_argument('--tgw', help='Source TGW', required=True)
     args = parser.parse_args()
 
-    aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
+    aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table,
+                              args.destination_ipv4, args.tgw)
     aws_network_graph(*aws_data)
