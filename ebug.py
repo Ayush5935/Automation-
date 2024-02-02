@@ -6,7 +6,7 @@ from dash.dependencies import Input, Output
 from dash_cytoscape import Cytoscape
 import dash_mantine_components as dmc
 import dash_bootstrap_components as dbc
-from mantine_icons import MantineIcon
+from dash_iconify import Icon
 
 def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
     # (unchanged)
@@ -61,55 +61,55 @@ def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_deta
                          'style': {
                              'background-color': '#6FB1FC',  # Blue
                              'border-color': '#3573A5',
-                             'background-image': MantineIcon('application'),
+                             'background-image': Icon(name="mdi-application", size="70%", color="white"),
                              'background-fit': 'cover',
-                             'background-width': '80%',
-                             'background-height': '80%',
+                             'background-width': '70%',
+                             'background-height': '70%',
                          }},
                         {'selector': '#subnet',
                          'style': {
                              'background-color': '#98FB98',  # Green
                              'border-color': '#4CAF50',
-                             'background-image': MantineIcon('application'),
+                             'background-image': Icon(name="mdi-application", size="70%", color="white"),
                              'background-fit': 'cover',
-                             'background-width': '80%',
-                             'background-height': '80%',
+                             'background-width': '70%',
+                             'background-height': '70%',
                          }},
                         {'selector': '#route_table',
                          'style': {
                              'background-color': '#FFD700',  # Yellow
                              'border-color': '#FFC107',
-                             'background-image': MantineIcon('application'),
+                             'background-image': Icon(name="mdi-application", size="70%", color="white"),
                              'background-fit': 'cover',
-                             'background-width': '80%',
-                             'background-height': '80%',
+                             'background-width': '70%',
+                             'background-height': '70%',
                          }},
                         {'selector': '#tgw',
                          'style': {
                              'background-color': '#FF6347',  # Red
                              'border-color': '#E57373',
-                             'background-image': MantineIcon('application'),
+                             'background-image': Icon(name="mdi-application", size="70%", color="white"),
                              'background-fit': 'cover',
-                             'background-width': '80%',
-                             'background-height': '80%',
+                             'background-width': '70%',
+                             'background-height': '70%',
                          }},
                         {'selector': '#tgw_attachment',
                          'style': {
                              'background-color': '#8A2BE2',  # Purple
                              'border-color': '#7B1FA2',
-                             'background-image': MantineIcon('application'),
+                             'background-image': Icon(name="mdi-application", size="70%", color="white"),
                              'background-fit': 'cover',
-                             'background-width': '80%',
-                             'background-height': '80%',
+                             'background-width': '70%',
+                             'background-height': '70%',
                          }},
                         {'selector': '#tgw_rtb',
                          'style': {
                              'background-color': '#30c8d9',  # Seagreen
                              'border-color': '#30c8d9',
-                             'background-image': MantineIcon('application'),
+                             'background-image': Icon(name="mdi-application", size="70%", color="white"),
                              'background-fit': 'cover',
-                             'background-width': '80%',
-                             'background-height': '80%',
+                             'background-width': '70%',
+                             'background-height': '70%',
                          }},
                         {'selector': 'edge',
                          'style': {
