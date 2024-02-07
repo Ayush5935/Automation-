@@ -67,3 +67,49 @@ phases:
       # Push Docker image to ECR
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URL
       - docker push $ECR_REPO_URL:$VERSION
+
+
+
+
+
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      # Install Helm
+      - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+      - chmod 700 get_helm.sh
+      - ./get_helm.sh
+
+      # Install unzip utility (if not already installed)
+      - apt-get update && apt-get install -y unzip
+
+      # Download the zip file from S3
+      - aws s3 cp s3://$S3_BUCKET/$ZIP_FILE_KEY .
+
+      # Extract the zip file
+      - unzip $ZIP_FILE_KEY
+
+      # Navigate to the directory containing the Helm chart files
+      - cd twistlock-defender
+
+      # Extract version from Chart.yaml and store it in a variable
+      - VERSION=$(cat Chart.yaml | grep 'version:' | awk '{print $2}')
+
+  build:
+    commands:
+      # Verify Helm version
+      - helm version
+
+      # Debug: Print the contents of Chart.yaml
+      - cat Chart.yaml
+
+      # Debug: Print the value of the $VERSION variable
+      - echo "Version: $VERSION"
+
+      # Save Helm chart to Amazon ECR
+      - helm chart save . $ECR_REPO_URL:$VERSION
+
+      # Push Helm chart to Amazon ECR
+      - helm chart push $ECR_REPO_URL:$VERSION
