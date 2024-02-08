@@ -7,50 +7,67 @@ client = boto3.client('networkmanager')
 # Function to retrieve global network ID
 def get_global_network_id():
     response = client.describe_global_networks()
-    if 'GlobalNetworks' in response and response['GlobalNetworks']:
-        return response['GlobalNetworks'][0]['GlobalNetworkId']
+    global_networks = response.get('GlobalNetworks', [])
+    if global_networks:
+        return global_networks[0]['GlobalNetworkId']
     else:
-        raise Exception("No global network found in the AWS account.")
+        return None
 
 # Function to retrieve mirror sessions details
 def get_mirror_sessions(global_network_id):
-    response = client.get_transit_gateway_registrations(GlobalNetworkId=global_network_id)
-    transit_gateway_arn = response['TransitGatewayRegistrations'][0]['TransitGatewayArn']
-    response = client.describe_transit_gateway_attachments(Filters=[{'Name': 'transit-gateway-arn', 'Values': [transit_gateway_arn]}])
-    attachment_id = response['TransitGatewayAttachments'][0]['TransitGatewayAttachmentId']
-    response = client.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[attachment_id])
-    mirror_sessions = response['TransitGatewayAttachments'][0]['Association']['MirrorConfiguration']['MirrorSessions']
-    return mirror_sessions
+    response = client.describe_global_networks()
+    if not global_network_id:
+        print("No global network found.")
+        return []
+    response = client.describe_transit_gateway_attachments(GlobalNetworkId=global_network_id)
+    attachments = response.get('TransitGatewayAttachments', [])
+    if attachments:
+        mirror_sessions = attachments[0]['Association']['MirrorConfiguration']['MirrorSessions']
+        return mirror_sessions
+    else:
+        print("No mirror sessions found.")
+        return []
 
 # Function to retrieve mirror targets details
 def get_mirror_targets(global_network_id):
-    response = client.get_transit_gateway_registrations(GlobalNetworkId=global_network_id)
-    transit_gateway_arn = response['TransitGatewayRegistrations'][0]['TransitGatewayArn']
-    response = client.describe_transit_gateway_attachments(Filters=[{'Name': 'transit-gateway-arn', 'Values': [transit_gateway_arn]}])
-    attachment_id = response['TransitGatewayAttachments'][0]['TransitGatewayAttachmentId']
-    response = client.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[attachment_id])
-    mirror_targets = response['TransitGatewayAttachments'][0]['Association']['MirrorConfiguration']['MirrorTargets']
-    return mirror_targets
+    response = client.describe_global_networks()
+    if not global_network_id:
+        print("No global network found.")
+        return []
+    response = client.describe_transit_gateway_attachments(GlobalNetworkId=global_network_id)
+    attachments = response.get('TransitGatewayAttachments', [])
+    if attachments:
+        mirror_targets = attachments[0]['Association']['MirrorConfiguration']['MirrorTargets']
+        return mirror_targets
+    else:
+        print("No mirror targets found.")
+        return []
 
 # Function to retrieve mirror filters details
 def get_mirror_filters(global_network_id):
-    response = client.get_transit_gateway_registrations(GlobalNetworkId=global_network_id)
-    transit_gateway_arn = response['TransitGatewayRegistrations'][0]['TransitGatewayArn']
-    response = client.describe_transit_gateway_attachments(Filters=[{'Name': 'transit-gateway-arn', 'Values': [transit_gateway_arn]}])
-    attachment_id = response['TransitGatewayAttachments'][0]['TransitGatewayAttachmentId']
-    response = client.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[attachment_id])
-    mirror_filters = response['TransitGatewayAttachments'][0]['Association']['MirrorConfiguration']['MirrorFilters']
-    return mirror_filters
+    response = client.describe_global_networks()
+    if not global_network_id:
+        print("No global network found.")
+        return []
+    response = client.describe_transit_gateway_attachments(GlobalNetworkId=global_network_id)
+    attachments = response.get('TransitGatewayAttachments', [])
+    if attachments:
+        mirror_filters = attachments[0]['Association']['MirrorConfiguration']['MirrorFilters']
+        return mirror_filters
+    else:
+        print("No mirror filters found.")
+        return []
 
 # Function to export data to CSV
 def export_to_csv(data, filename):
     with open(filename, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(data[0].keys())  # Write header row
+        writer.writerow(data[0].keys()) if data else None  # Write header row if data is present
         for item in data:
             writer.writerow(item.values())
 
-try:
+# Main function
+def main():
     global_network_id = get_global_network_id()
 
     # Get mirror sessions details
@@ -66,5 +83,6 @@ try:
     export_to_csv(mirror_filters, 'mirror_filters.csv')
 
     print("CSV files exported successfully.")
-except Exception as e:
-    print("Error:", e)
+
+if __name__ == "__main__":
+    main()
