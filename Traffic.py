@@ -1,22 +1,15 @@
 import boto3
 import csv
 
-# Initialize Boto3 client
-client = boto3.client('networkmanager')
+# Initialize Boto3 client for EC2
+client = boto3.client('ec2')
 
 # Function to retrieve mirror sessions details
 def get_mirror_sessions():
     try:
-        response = client.describe_global_networks()
-        global_networks = response.get('GlobalNetworks', [])
-        if global_networks:
-            global_network_id = global_networks[0]['GlobalNetworkId']
-            response = client.describe_transit_gateway_attachments(GlobalNetworkId=global_network_id)
-            attachments = response.get('TransitGatewayAttachments', [])
-            if attachments:
-                mirror_sessions = attachments[0]['Association']['MirrorConfiguration']['MirrorSessions']
-                return mirror_sessions
-        return []
+        response = client.describe_traffic_mirror_sessions()
+        mirror_sessions = response.get('TrafficMirrorSessions', [])
+        return mirror_sessions
     except Exception as e:
         print(f"Error retrieving mirror sessions: {e}")
         return []
@@ -24,16 +17,9 @@ def get_mirror_sessions():
 # Function to retrieve mirror targets details
 def get_mirror_targets():
     try:
-        response = client.describe_global_networks()
-        global_networks = response.get('GlobalNetworks', [])
-        if global_networks:
-            global_network_id = global_networks[0]['GlobalNetworkId']
-            response = client.describe_transit_gateway_attachments(GlobalNetworkId=global_network_id)
-            attachments = response.get('TransitGatewayAttachments', [])
-            if attachments:
-                mirror_targets = attachments[0]['Association']['MirrorConfiguration']['MirrorTargets']
-                return mirror_targets
-        return []
+        response = client.describe_traffic_mirror_targets()
+        mirror_targets = response.get('TrafficMirrorTargets', [])
+        return mirror_targets
     except Exception as e:
         print(f"Error retrieving mirror targets: {e}")
         return []
@@ -41,16 +27,9 @@ def get_mirror_targets():
 # Function to retrieve mirror filters details
 def get_mirror_filters():
     try:
-        response = client.describe_global_networks()
-        global_networks = response.get('GlobalNetworks', [])
-        if global_networks:
-            global_network_id = global_networks[0]['GlobalNetworkId']
-            response = client.describe_transit_gateway_attachments(GlobalNetworkId=global_network_id)
-            attachments = response.get('TransitGatewayAttachments', [])
-            if attachments:
-                mirror_filters = attachments[0]['Association']['MirrorConfiguration']['MirrorFilters']
-                return mirror_filters
-        return []
+        response = client.describe_traffic_mirror_filters()
+        mirror_filters = response.get('TrafficMirrorFilters', [])
+        return mirror_filters
     except Exception as e:
         print(f"Error retrieving mirror filters: {e}")
         return []
