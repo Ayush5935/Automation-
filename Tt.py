@@ -4,57 +4,52 @@ import csv
 # Initialize Boto3 client for EC2
 client = boto3.client('ec2')
 
-# Function to retrieve mirror filters details
-def get_mirror_filters():
+# Function to retrieve network interfaces details along with their associated source and target
+def get_network_interfaces():
     try:
-        response = client.describe_traffic_mirror_filters()
-        mirror_filters = response.get('TrafficMirrorFilters', [])
-        formatted_filters = []
-        for mirror_filter in mirror_filters:
-            ingress_rules = format_filter_rules(mirror_filter.get('IngressFilterRules', []))
-            egress_rules = format_filter_rules(mirror_filter.get('EgressFilterRules', []))
-            for ingress_rule in ingress_rules:
-                formatted_filter = {
-                    'FilterId': mirror_filter.get('TrafficMirrorFilterId', ''),
-                    'Description': mirror_filter.get('Description', ''),
-                    'RuleType': 'Ingress',
-                    'RuleDetails': ingress_rule
-                }
-                formatted_filters.append(formatted_filter)
-            for egress_rule in egress_rules:
-                formatted_filter = {
-                    'FilterId': mirror_filter.get('TrafficMirrorFilterId', ''),
-                    'Description': mirror_filter.get('Description', ''),
-                    'RuleType': 'Egress',
-                    'RuleDetails': egress_rule
-                }
-                formatted_filters.append(formatted_filter)
-        return formatted_filters
+        response = client.describe_network_interfaces()
+        network_interfaces = response.get('NetworkInterfaces', [])
+        formatted_data = []
+        for interface in network_interfaces:
+            interface_id = interface.get('NetworkInterfaceId', '')
+            source, target = get_source_target(interface_id)
+            formatted_data.append({
+                'NetworkInterfaceId': interface_id,
+                'Source': source,
+                'Target': target
+            })
+        return formatted_data
     except Exception as e:
-        print(f"Error retrieving mirror filters: {e}")
+        print(f"Error retrieving network interfaces: {e}")
         return []
 
-# Function to format filter rules
-def format_filter_rules(rules):
-    formatted_rules = []
-    for rule in rules:
-        formatted_rule = (
-            f"RuleId: {rule.get('TrafficMirrorFilterRuleId', '')}, "
-            f"RuleAction: {rule.get('RuleAction', '')}, "
-            f"RuleNumber: {rule.get('RuleNumber', '')}"
-            # Add more details if needed
-        )
-        formatted_rules.append(formatted_rule)
-    return formatted_rules
+# Function to retrieve source and target associated with a network interface
+def get_source_target(interface_id):
+    try:
+        response = client.describe_traffic_mirror_sessions(Filters=[{'Name': 'NetworkInterfaceId', 'Values': [interface_id]}])
+        sessions = response.get('TrafficMirrorSessions', [])
+        source = []
+        target = []
+        for session in sessions:
+            source_id = session.get('SourceId', '')
+            target_id = session.get('TargetId', '')
+            if source_id:
+                source.append(source_id)
+            if target_id:
+                target.append(target_id)
+        return ','.join(source), ','.join(target)
+    except Exception as e:
+        print(f"Error retrieving source and target info for {interface_id}: {e}")
+        return '', ''
 
-# Function to export data to CSV for mirror filters
-def export_mirror_filters_to_csv(data, filename):
+# Function to export data to CSV
+def export_to_csv(data, filename):
     if not data:
         print(f"No data to export for {filename}")
         return
     try:
         with open(filename, 'w', newline='') as csvfile:
-            fieldnames = ['FilterId', 'Description', 'RuleType', 'RuleDetails']
+            fieldnames = ['NetworkInterfaceId', 'Source', 'Target']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for item in data:
@@ -65,10 +60,9 @@ def export_mirror_filters_to_csv(data, filename):
 
 # Main function
 def main():
-    # Get mirror filters details
-    mirror_filters = get_mirror_filters()
-    export_mirror_filters_to_csv(mirror_filters, 'mirror_filters.csv')
+    # Get network interfaces details with source and target
+    network_interfaces = get_network_interfaces()
+    export_to_csv(network_interfaces, 'network_interfaces_with_source_target.csv')
 
 if __name__ == "__main__":
     main()
-￼Enter
