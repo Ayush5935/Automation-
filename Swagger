@@ -1,0 +1,130 @@
+Sure, here's a comprehensive step-by-step guide to add Swagger documentation for all the methods you mentioned: user registration, user login, and listing all books, including setting up Swagger UI.
+
+### Step 1: Annotate Your Code
+
+Add Swagger annotations to your handlers:
+
+```go
+// authentication.go
+
+package handlers
+
+import "github.com/gin-gonic/gin"
+
+// @Summary User registration
+// @Description Registers a new user
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param body body RegisterRequest true "User information"
+// @Success 200 {string} Message "User registered successfully"
+// @Router /register [post]
+func RegisterHandler(c *gin.Context) {
+    // Your registration logic here
+}
+
+// @Summary User login
+Sure, here's a comprehensive step-by-step guide to add Swagger documentation for all the methods you mentioned: user registration, user login, and listing all books, including setting up Swagger UI.
+
+### Step 1: Annotate Your Code
+
+Add Swagger annotations to your handlers:
+
+```go
+// authentication.go
+
+package handlers
+
+import "github.com/gin-gonic/gin"
+
+// @Summary User registration
+// @Description Registers a new user
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param body body RegisterRequest true "User information"
+// @Success 200 {string} Message "User registered successfully"
+// @Router /register [post]
+func RegisterHandler(c *gin.Context) {
+    // Your registration logic here
+}
+
+// @Summary User login
+// @Description Logs a user into the system
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param body body LoginRequest true "User credentials"
+// @Success 200 {string} Token "Authentication token"
+// @Router /login [post]
+func LoginHandler(c *gin.Context) {
+    // Your login logic here
+}
+```
+
+```go
+// book.go
+
+package handlers
+
+import "github.com/gin-gonic/gin"
+
+// @Summary List all books
+// @Description Retrieves a list of all books
+// @Tags books
+// @Accept json
+// @Produce json
+// @Success 200 {array} Book "List of books"
+// @Router /books [get]
+func GetBooks(c *gin.Context) {
+    // Your logic to fetch and return books here
+}
+```
+
+### Step 2: Generate Swagger Documentation
+
+Run the Swaggo command to generate Swagger documentation:
+
+```bash
+swag init
+```
+
+### Step 3: Serve Swagger UI
+
+In your main file, set up your Gin router and serve the Swagger UI:
+
+```go
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/swaggo/gin-swagger"
+    "github.com/swaggo/gin-swagger/swaggerFiles"
+    "yourmodulepath/library_management_system/handlers"
+)
+
+func main() {
+    r := gin.Default()
+
+    // Define your routes
+    r.POST("/register", handlers.RegisterHandler)
+    r.POST("/login", handlers.LoginHandler)
+    r.GET("/books", handlers.GetBooks)
+
+    // Serve Swagger documentation
+    r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+    // Run your server
+    r.Run(":8080")
+}
+```
+
+### Step 4: Run Your Server
+
+Start your Golang server:
+
+```bash
+go run main.go
+```
+
+Now, you can access the Swagger UI at `http://localhost:8080/swagger/index.html` to view and interact with your API documentation. You'll see the documentation for all the endpoints you've documented, including user registration, user login, and listing all books.￼Enter
