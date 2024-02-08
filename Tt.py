@@ -26,17 +26,18 @@ def get_network_interfaces():
 # Function to retrieve source and target associated with a network interface
 def get_source_target(interface_id):
     try:
-        response = client.describe_traffic_mirror_sessions(Filters=[{'Name': 'NetworkInterfaceId', 'Values': [interface_id]}])
+        response = client.describe_traffic_mirror_sessions()
         sessions = response.get('TrafficMirrorSessions', [])
         source = []
         target = []
         for session in sessions:
-            source_id = session.get('SourceId', '')
-            target_id = session.get('TargetId', '')
-            if source_id:
-                source.append(source_id)
-            if target_id:
-                target.append(target_id)
+            if session.get('NetworkInterfaceId') == interface_id:
+                source_id = session.get('SourceId', '')
+                target_id = session.get('TargetId', '')
+                if source_id:
+                    source.append(source_id)
+                if target_id:
+                    target.append(target_id)
         return ','.join(source), ','.join(target)
     except Exception as e:
         print(f"Error retrieving source and target info for {interface_id}: {e}")
