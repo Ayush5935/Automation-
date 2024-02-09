@@ -22,18 +22,23 @@ def export_to_csv(data, filename):
     try:
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['FilterId', 'Description', 'RuleId', 'RuleNumber', 'RuleAction', 'TrafficDirection'])  # Write header row
+            writer.writerow(['FilterId', 'Description', 'RuleType', 'RuleId', 'RuleNumber', 'RuleAction'])  # Write header row
             for filter in data:
                 filter_id = filter.get('TrafficMirrorFilterId', 'N/A')
                 description = filter.get('Description', 'N/A')
                 rules = filter.get('TrafficMirrorFilterRules', [])
-                print(f"Rules for filter {filter_id}: {rules}")
                 for rule in rules:
                     rule_id = rule.get('TrafficMirrorFilterRuleId', 'N/A')
                     rule_number = rule.get('RuleNumber', 'N/A')
                     rule_action = rule.get('RuleAction', 'N/A')
                     traffic_direction = rule.get('TrafficDirection', 'N/A')
-                    writer.writerow([filter_id, description, rule_id, rule_number, rule_action, traffic_direction])
+                    if traffic_direction == 'ingress':
+                        rule_type = 'IngressRule'
+                    elif traffic_direction == 'egress':
+                        rule_type = 'EgressRule'
+                    else:
+                        rule_type = 'Unknown'
+                    writer.writerow([filter_id, description, rule_type, rule_id, rule_number, rule_action])
         print(f"Data exported to {filename} successfully.")
     except Exception as e:
         print(f"Error exporting data to {filename}: {e}")
@@ -42,7 +47,6 @@ def export_to_csv(data, filename):
 def main():
     # Get mirror filters details
     mirror_filters = get_mirror_filters()
-    print(f"Retrieved mirror filters: {mirror_filters}")
     
     # Export mirror filter data to CSV
     export_to_csv(mirror_filters, 'mirror_filters.csv')
