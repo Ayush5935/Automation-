@@ -4,25 +4,15 @@ import csv
 # Initialize Boto3 client for EC2
 client = boto3.client('ec2')
 
-# Function to retrieve mirror sessions details
-def get_mirror_sessions():
+# Function to retrieve mirror filters details
+def get_mirror_filters():
     try:
-        response = client.describe_traffic_mirror_sessions()
-        mirror_sessions = response.get('TrafficMirrorSessions', [])
-        return mirror_sessions
+        response = client.describe_traffic_mirror_filters()
+        mirror_filters = response.get('TrafficMirrorFilters', [])
+        return mirror_filters
     except Exception as e:
-        print(f"Error retrieving mirror sessions: {e}")
+        print(f"Error retrieving mirror filters: {e}")
         return []
-
-# Function to retrieve ENI details
-def get_eni_details(eni_id):
-    try:
-        response = client.describe_network_interfaces(NetworkInterfaceIds=[eni_id])
-        eni_details = response.get('NetworkInterfaces', [])
-        return eni_details[0] if eni_details else None
-    except Exception as e:
-        print(f"Error retrieving ENI details for {eni_id}: {e}")
-        return None
 
 # Function to export data to CSV
 def export_to_csv(data, filename):
@@ -32,35 +22,37 @@ def export_to_csv(data, filename):
     try:
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['eni_id', 'privateIPAddress', 'Type'])  # Write header row
+            writer.writerow(['FilterId', 'Description', 'Rule', 'TrafficDirection'])  # Write header row
             for item in data:
-                writer.writerow(item)
+                filter_id = item.get('FilterId', 'N/A')
+                description = item.get('Description', 'N/A')
+                rules = item.get('Rules', [])
+                for rule in rules:
+                    rule_id = rule.get('RuleId', 'N/A')
+                    rule_number = rule.get('RuleNumber', 'N/A')
+                    rule_action = rule.get('RuleAction', 'N/A')
+                    rule_details = f"RuleID: {rule_id}\nRuleNumber: {rule_number}\nRuleAction: {rule_action}"
+                    writer.writerow([filter_id, description, rule_details, rule.get('TrafficDirection', 'N/A')])
         print(f"Data exported to {filename} successfully.")
     except Exception as e:
         print(f"Error exporting data to {filename}: {e}")
 
 # Main function
 def main():
-    # Get mirror sessions details
-    mirror_sessions = get_mirror_sessions()
+    # Get mirror filters details
+    mirror_filters = get_mirror_filters()
     
-    # Extract ENI details from mirror sessions and collect private IPv4 addresses
-    eni_ipv4_data = []
-    for session in mirror_sessions:
-        eni_id = session.get('NetworkInterfaceId')
-        if eni_id:
-            eni_details = get_eni_details(eni_id)
-            if eni_details:
-                private_ipv4s = eni_details.get('PrivateIpAddresses', [])
-                for private_ipv4 in private_ipv4s:
-                    eni_ipv4_data.append([
-                        eni_id,
-                        private_ipv4.get('PrivateIpAddress', 'N/A'),
-                        'Primary' if private_ipv4.get('Primary', False) else 'Secondary'
-                    ])
+    # Prepare data for CSV export
+    export_data = []
+    for filter in mirror_filters:
+        filter_id = filter.get('TrafficMirrorFilterId', 'N/A')
+        description = filter.get('Description', 'N/A')
+        rules = filter.get('TrafficMirrorFilterRules', [])
+        export_data.append({'FilterId': filter_id, 'Description': description, 'Rules': rules})
     
-    # Export ENI IPv4 data to CSV
-    export_to_csv(eni_ipv4_data, 'eni_ipv4_addresses.csv')
+    # Export mirror filter data to CSV
+    export_to_csv(export_data, 'mirror_filters.csv')
 
 if __name__ == "__main__":
     main()
+￼Enter
