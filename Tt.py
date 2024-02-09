@@ -4,44 +4,40 @@ import csv
 # Initialize Boto3 client for EC2
 client = boto3.client('ec2')
 
-# Function to retrieve network interfaces details along with their associated source and target
-def get_network_interfaces():
+# Function to retrieve mirror filters details
+def get_mirror_filters():
     try:
-        response = client.describe_network_interfaces()
-        network_interfaces = response.get('NetworkInterfaces', [])
-        formatted_data = []
-        for interface in network_interfaces:
-            interface_id = interface.get('NetworkInterfaceId', '')
-            source, target = get_source_target(interface_id)
-            formatted_data.append({
-                'NetworkInterfaceId': interface_id,
-                'Source': source,
-                'Target': target
-            })
-        return formatted_data
+        response = client.describe_traffic_mirror_filters()
+        mirror_filters = response.get('TrafficMirrorFilters', [])
+        formatted_filters = []
+        for mirror_filter in mirror_filters:
+            ingress_rules = format_filter_rules(mirror_filter.get('IngressFilterRules', []))
+            egress_rules = format_filter_rules(mirror_filter.get('EgressFilterRules', []))
+            formatted_filter = {
+                'FilterId': mirror_filter.get('TrafficMirrorFilterId', ''),
+                'Description': mirror_filter.get('Description', ''),
+                'IngressFilterRules': '\n'.join(ingress_rules),
+                'EgressFilterRules': '\n'.join(egress_rules)
+            }
+            formatted_filters.append(formatted_filter)
+        return formatted_filters
     except Exception as e:
-        print(f"Error retrieving network interfaces: {e}")
+        print(f"Error retrieving mirror filters: {e}")
         return []
 
-# Function to retrieve source and target associated with a network interface
-def get_source_target(interface_id):
-    try:
-        response = client.describe_traffic_mirror_sessions()
-        sessions = response.get('TrafficMirrorSessions', [])
-        source = []
-        target = []
-        for session in sessions:
-            if session.get('NetworkInterfaceId') == interface_id:
-                source_id = session.get('SourceId', '')
-                target_id = session.get('TargetId', '')
-                if source_id:
-                    source.append(source_id)
-                if target_id:
-                    target.append(target_id)
-        return ','.join(source), ','.join(target)
-    except Exception as e:
-        print(f"Error retrieving source and target info for {interface_id}: {e}")
-        return '', ''
+# Function to format filter rules
+def format_filter_rules(rules):
+    formatted_rules = []
+    for rule in rules:
+        formatted_rule = {
+            'RuleId': rule.get('TrafficMirrorFilterRuleId', ''),
+            'TrafficDirection': rule.get('TrafficDirection', ''),
+            'RuleAction': rule.get('RuleAction', ''),
+            'RuleNumber': rule.get('RuleNumber', '')
+            # Add more details if needed
+        }
+        formatted_rules.append(formatted_rule)
+    return formatted_rules
 
 # Function to export data to CSV
 def export_to_csv(data, filename):
@@ -50,7 +46,7 @@ def export_to_csv(data, filename):
         return
     try:
         with open(filename, 'w', newline='') as csvfile:
-            fieldnames = ['NetworkInterfaceId', 'Source', 'Target']
+            fieldnames = ['FilterId', 'Description', 'IngressFilterRules', 'EgressFilterRules']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for item in data:
@@ -61,9 +57,9 @@ def export_to_csv(data, filename):
 
 # Main function
 def main():
-    # Get network interfaces details with source and target
-    network_interfaces = get_network_interfaces()
-    export_to_csv(network_interfaces, 'network_interfaces_with_source_target.csv')
+    # Get mirror filters details
+    mirror_filters = get_mirror_filters()
+    export_to_csv(mirror_filters, 'mirror_filters.csv')
 
 if __name__ == "__main__":
     main()
