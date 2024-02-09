@@ -23,10 +23,10 @@ def export_to_csv(data, filename):
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(['FilterId', 'Description', 'Rule', 'TrafficDirection'])  # Write header row
-            for item in data:
-                filter_id = item.get('TrafficMirrorFilterId', 'N/A')
-                description = item.get('Description', 'N/A')
-                rules = item.get('TrafficMirrorFilterRules', [])
+            for filter in data:
+                filter_id = filter.get('TrafficMirrorFilterId', 'N/A')
+                description = filter.get('Description', 'N/A')
+                rules = filter.get('TrafficMirrorFilterRules', [])
                 for rule in rules:
                     rule_id = rule.get('TrafficMirrorFilterRuleId', 'N/A')
                     rule_number = rule.get('RuleNumber', 'N/A')
