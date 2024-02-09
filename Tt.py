@@ -24,11 +24,11 @@ def export_to_csv(data, filename):
             writer = csv.writer(csvfile)
             writer.writerow(['FilterId', 'Description', 'Rule', 'TrafficDirection'])  # Write header row
             for item in data:
-                filter_id = item.get('FilterId', 'N/A')
+                filter_id = item.get('TrafficMirrorFilterId', 'N/A')
                 description = item.get('Description', 'N/A')
-                rules = item.get('Rules', [])
+                rules = item.get('TrafficMirrorFilterRules', [])
                 for rule in rules:
-                    rule_id = rule.get('RuleId', 'N/A')
+                    rule_id = rule.get('TrafficMirrorFilterRuleId', 'N/A')
                     rule_number = rule.get('RuleNumber', 'N/A')
                     rule_action = rule.get('RuleAction', 'N/A')
                     rule_details = f"RuleID: {rule_id}\nRuleNumber: {rule_number}\nRuleAction: {rule_action}"
@@ -42,17 +42,8 @@ def main():
     # Get mirror filters details
     mirror_filters = get_mirror_filters()
     
-    # Prepare data for CSV export
-    export_data = []
-    for filter in mirror_filters:
-        filter_id = filter.get('TrafficMirrorFilterId', 'N/A')
-        description = filter.get('Description', 'N/A')
-        rules = filter.get('TrafficMirrorFilterRules', [])
-        export_data.append({'FilterId': filter_id, 'Description': description, 'Rules': rules})
-    
     # Export mirror filter data to CSV
-    export_to_csv(export_data, 'mirror_filters.csv')
+    export_to_csv(mirror_filters, 'mirror_filters.csv')
 
 if __name__ == "__main__":
     main()
-￼Enter
