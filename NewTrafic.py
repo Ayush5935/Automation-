@@ -1,14 +1,6 @@
 import boto3
 import csv
 
-def get_all_regions():
-    """
-    Function to retrieve all AWS regions
-    """
-    ec2_client = boto3.client('ec2', region_name='us-east-1')
-    response = ec2_client.describe_regions()
-    return [region['RegionName'] for region in response['Regions']]
-
 def get_mirror_sessions(client):
     """
     Function to retrieve mirror sessions details for a specific region
@@ -38,10 +30,11 @@ def export_to_csv(data, filename):
         print(f"No data to export for {filename}")
         return
     try:
-        with open(filename, 'w', newline='') as csvfile:
+        with open(filename, 'a', newline='') as csvfile:
             fieldnames = [key for key in data[0].keys() if key != 'Tags']  # Exclude 'Tags' field
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+            if csvfile.tell() == 0:  # Check if file is empty
+                writer.writeheader()
             for row in data:
                 writer.writerow({key: row[key] for key in fieldnames})
         print(f"Data exported to {filename} successfully.")
@@ -49,17 +42,16 @@ def export_to_csv(data, filename):
         print(f"Error exporting data to {filename}: {e}")
 
 def main():
-    regions = get_all_regions()
+    regions = ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2']
     for region in regions:
         session = boto3.Session(region_name=region)
         client = session.client('ec2')
         
         mirror_sessions = get_mirror_sessions(client)
-        export_to_csv(mirror_sessions, f'mirror_sessions_{region}.csv')
+        export_to_csv(mirror_sessions, 'all_mirror_sessions.csv')
         
         mirror_targets = get_mirror_targets(client)
-        export_to_csv(mirror_targets, f'mirror_targets_{region}.csv')
+        export_to_csv(mirror_targets, 'all_mirror_targets.csv')
 
 if __name__ == "__main__":
     main()
-￼Enter
