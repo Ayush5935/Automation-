@@ -50,58 +50,6 @@ def refresh_sso_access_token(access_token, expires_at):
     current_time = datetime.datetime.utcnow()
     if expires_at is None or current_time >= expires_at - datetime.timedelta(seconds=buffer_time):
         print(f"Refreshing SSO access token...")
-import csv
-import boto3
-import datetime
-import webbrowser
-
-# Define the input and output file names and locations
-input_file = "input.csv"
-output_file = "output.csv"
-
-# Define the AWS SSO login URL
-sso_url = "https://d-92670ca28f.awsapps.com/start#/"  # Update with your start URL
-
-# Define a function to obtain the SSO access token using the device authorization grant flow
-def get_sso_access_token():
-    session = boto3.Session()
-    region = 'us-west-2'  # Update with your preferred region
-    sso_oidc = session.client('sso-oidc', region_name=region)
-    client_creds = sso_oidc.register_client(clientName='myapp', clientType='public')
-    device_authorization = sso_oidc.start_device_authorization(
-        clientId=client_creds['clientId'],
-        clientSecret=client_creds['clientSecret'],
-        startUrl=sso_url
-    )
-    url = device_authorization['verificationUriComplete']
-    device_code = device_authorization['deviceCode']
-    expires_in = device_authorization['expiresIn']
-    interval = device_authorization['interval']
-    webbrowser.open(url, autoraise=True)
-    print(f"Open the following URL in your browser to authenticate: {url}")
-    print(f"Waiting for authentication...")
-    for _ in range(1, expires_in // interval + 1):
-        try:
-            token = sso_oidc.create_token(
-                grantType='urn:ietf:params:oauth:grant-type:device_code',
-                deviceCode=device_code,
-                clientId=client_creds['clientId'],
-                clientSecret=client_creds['clientSecret']
-            )
-            expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=token['expiresIn'])
-            return token['accessToken'], expires_at
-        except sso_oidc.exceptions.AuthorizationPendingException:
-            pass
-        except Exception as e:
-            print(f"Error: {e}")
-            return None, None
-
-# Define a function to refresh the SSO access token if it is expired or close to expiration
-def refresh_sso_access_token(access_token, expires_at):
-    buffer_time = 5 * 60  # 5 minutes
-    current_time = datetime.datetime.utcnow()
-    if expires_at is None or current_time >= expires_at - datetime.timedelta(seconds=buffer_time):
-        print(f"Refreshing SSO access token...")
         access_token, expires_at = get_sso_access_token()
         if access_token is None:
             print("Failed to obtain SSO access token.")
@@ -179,4 +127,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-￼Enter
