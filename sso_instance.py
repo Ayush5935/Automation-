@@ -61,6 +61,11 @@ def refresh_sso_access_token(access_token, expires_at):
 
 # Define a function to obtain the VPC ID and Subnet ID for a given instance ID, region, and access token
 def get_vpc_subnet_id(instance_id, region, access_token):
+    # Refresh the SSO access token if it is expired or close to expiration
+    access_token, expires_at = refresh_sso_access_token(access_token, None)
+    if access_token is None:
+        return None, None
+
     session = boto3.session.Session()
     sso = session.client('sso', region_name=region)
 
@@ -111,14 +116,8 @@ def main():
         instance_id = row['Instance ID']
         region = row['Region']
 
-        # Call the refresh_sso_access_token function to get a valid SSO access token for the current account and region
-        access_token, expires_at = refresh_sso_access_token(None, None)
-        if access_token is None:
-            print(f"Failed to get SSO access token for account {account_id} and region {region}.")
-            continue
-        
         # Call the get_vpc_subnet_id function to get the VPC ID and Subnet ID for the current instance ID and region
-        vpc_id, subnet_id = get_vpc_subnet_id(instance_id, region, access_token)
+        vpc_id, subnet_id = get_vpc_subnet_id(instance_id, region, None)
         if vpc_id is None or subnet_id is None:
             print(f"Failed to get VPC ID and Subnet ID for instance {instance_id} in region {region}.")
             continue
