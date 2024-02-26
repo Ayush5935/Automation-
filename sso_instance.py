@@ -1,8 +1,5 @@
-# Import the required modules
 import csv
 import boto3
-import subprocess
-import json
 import datetime
 
 # Define the input and output file names and locations
@@ -36,7 +33,9 @@ def get_sso_access_token():
                 clientId=client_creds['clientId'],
                 clientSecret=client_creds['clientSecret']
             )
-            return token['accessToken'], token['expiresAt']
+            # Calculate the expiration time based on the current time plus the expiration duration
+            expires_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=token['expiresIn'])
+            return token['accessToken'], expires_at
         except sso_oidc.exceptions.AuthorizationPendingException:
             pass
         except Exception as e:
@@ -49,10 +48,8 @@ def refresh_sso_access_token(access_token, expires_at):
     buffer_time = 5 * 60
     # Get the current time in UTC
     current_time = datetime.datetime.utcnow()
-    # Convert the expiration time from ISO 8601 format to a datetime object
-    expires_at = datetime.datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
     # Check if the current time is within the buffer time of the expiration time
-    if current_time >= expires_at - datetime.timedelta(seconds=buffer_time):
+    if expires_at is None or current_time >= expires_at - datetime.timedelta(seconds=buffer_time):
         # Obtain a new access token using the same SSO URL
         print(f"Refreshing SSO access token...")
         access_token, expires_at = get_sso_access_token()
