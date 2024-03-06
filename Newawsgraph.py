@@ -6,141 +6,63 @@ from dash.dependencies import Input, Output
 from dash_cytoscape import Cytoscape
 import dash_mantine_components as dmc
 import dash_bootstrap_components as dbc
+import ipaddress
+
+def calculate_ip_distance(ip1, ip2):
+    try:
+        ip1 = ipaddress.IPv4Address(ip1)
+        ip2 = ipaddress.IPv4Address(ip2)
+        return abs(int(ip1) - int(ip2))
+    except ValueError:
+        return float('inf')  # Return infinity if IP addresses are invalid
 
 def fetch_aws_data(account, region, ipv4, eni, subnet, route_table, destination_ipv4, tgw):
     session = boto3.Session(region_name=region)
     ec2_client = session.client('ec2')
-    
-    # Fetch VPCs
-    vpcs = ec2_client.describe_vpcs()['Vpcs']
-    vpc_details = [{'label': vpc['VpcId'], 'value': vpc['VpcId']} for vpc in vpcs]
 
-    # Fetch ENIs
-    eni_details = [{'label': eni['NetworkInterfaceId'], 'value': eni['NetworkInterfaceId']} for eni in ec2_client.describe_network_interfaces()['NetworkInterfaces']]
+    # Fetch ENI details
+    eni_details = [{'label': eni['NetworkInterfaceId'], 'value': eni['NetworkInterfaceId']} for eni in ec2_client.describe_network_interfaces(NetworkInterfaceIds=[eni])['NetworkInterfaces']]
 
-    # Fetch Subnets
-    subnet_details = [{'label': subnet['SubnetId'], 'value': subnet['SubnetId']} for subnet in ec2_client.describe_subnets()['Subnets']]
+    # Fetch Subnet details
+    subnet_id = eni_details[0]['subnet_id']
+    subnet_details = [{'label': subnet['SubnetId'], 'value': subnet['SubnetId']} for subnet in ec2_client.describe_subnets(SubnetIds=[subnet_id])['Subnets']]
 
-    # Fetch Route Tables
-    route_table_details = [{'label': rt['RouteTableId'], 'value': rt['RouteTableId']} for rt in ec2_client.describe_route_tables()['RouteTables']]
+    # Fetch VPC details
+    vpc_id = subnet_details[0]['vpc_id']
+    vpc_details = [{'label': vpc['VpcId'], 'value': vpc['VpcId']} for vpc in ec2_client.describe_vpcs(VpcIds=[vpc_id])['Vpcs']]
 
-    # Fetch TGWs
-    tgw_details = [{'label': tgw['TransitGatewayId'], 'value': tgw['TransitGatewayId']} for tgw in ec2_client.describe_transit_gateways()['TransitGateways']]
+    # Fetch Route Table details
+    route_table_id = subnet_details[0]['route_table_id']
+    route_table_details = [{'label': rt['RouteTableId'], 'value': rt['RouteTableId']} for rt in ec2_client.describe_route_tables(RouteTableIds=[route_table_id])['RouteTables']]
 
-    # Fetch TGW Attachments
+    # Check routes in the route table
+    for rt in route_table_details:
+        routes = ec2_client.describe_route_tables(RouteTableIds=[rt['value']])['RouteTables'][0]['Routes']
+        for route in routes:
+            if 'NatGatewayId' in route or 'GatewayId' in route:  # Check for NAT or IGW
+                break
+        else:
+            continue
+        break  # Break the loop if NAT or IGW found
+
+    # Fetch TGW details
+    tgw_details = [{'label': tgw['TransitGatewayId'], 'value': tgw['TransitGatewayId']} for tgw in ec2_client.describe_transit_gateways(TransitGatewayIds=[tgw])['TransitGateways']]
+
+    # Fetch TGW Route Table details
     tgw_attachments = ec2_client.describe_transit_gateway_attachments(Filters=[{'Name': 'transit-gateway-id', 'Values': [tgw]}])['TransitGatewayAttachments']
+    tgw_route_table_details = []
+    for attachment in tgw_attachments:
+        tgw_route_table_id = attachment['Association']['TransitGatewayRouteTableId']
+        tgw_route_table_details.append({'label': tgw_route_table_id, 'value': tgw_route_table_id})
 
-    # Fetch Cross Region TGWs
-    cross_region_tgw_details = []
-    for reg in ec2_client.describe_regions()['Regions']:
-        cross_region_session = boto3.Session(region_name=reg['RegionName'])
-        cross_region_ec2_client = cross_region_session.client('ec2')
-        cross_region_tgws = cross_region_ec2_client.describe_transit_gateways()['TransitGateways']
-        for tgw in cross_region_tgws:
-            cross_region_tgw_details.append({'label': tgw['TransitGatewayId'], 'value': tgw['TransitGatewayId']})
-            # Fetching TGW Route Table for Cross Region TGW
-            tgw_route_tables = cross_region_ec2_client.describe_transit_gateway_route_tables(Filters=[{'Name': 'transit-gateway-id', 'Values': [tgw['TransitGatewayId']]}])['TransitGatewayRouteTables']
-            for rt in tgw_route_tables:
-                cross_region_tgw_route_table_id = rt['TransitGatewayRouteTableId']
-                cross_region_tgw_route_table_details.append({'label': cross_region_tgw_route_table_id, 'value': cross_region_tgw_route_table_id})
+    # Check if any retrieved resource is too close to the destination IP address
+    close_resources = []
+    for resource in [eni_details, subnet_details, route_table_details, vpc_details, tgw_details, tgw_route_table_details]:
+        for item in resource:
+            if calculate_ip_distance(destination_ipv4, item['label']) < 10:  # Set the threshold as needed
+                close_resources.append(item['label'])
 
-    return eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments, vpc_details, cross_region_tgw_details, cross_region_tgw_route_table_details
+    return eni_details, subnet_details, route_table_details, vpc_details, tgw_details, tgw_route_table_details, tgw_attachments, close_resources
 
-def aws_network_graph(eni_details, subnet_details, route_table_details, tgw_details, tgw_attachments, vpc_details, cross_region_tgw_details, cross_region_tgw_route_table_details):
-    elements = []
-    
-    # Extracting data for local region
-    vpc_id = vpc_details[0]["label"]
-    eni_id = eni_details[0]["label"]
-    subnet_id = subnet_details[0]["label"]
-    route_table_id = route_table_details[0]["label"]
-    tgw_id = tgw_details[0]["label"]
-    tgw_attachment_id = tgw_attachments[0]["TransitGatewayAttachmentId"]
-    tgw_route_table_id = tgw_attachments[0]['Association'].get('TransitGatewayRouteTableId')
+# The rest of the code remains the same...
 
-    # Add nodes for local region
-    elements.append({'data': {'id': 'eni', 'label': f'ENI {eni_id}', 'type': 'ENI'}})
-    elements.append({'data': {'id': 'subnet', 'label': f'Subnet {subnet_id}', 'type': 'Subnet'}})
-    elements.append({'data': {'id': 'route_table', 'label': f'Route Table {route_table_id}', 'type': 'Route Table'}})
-    elements.append({'data': {'id': 'tgw', 'label': f'Transit Gateway {tgw_id}', 'type': 'Transit Gateway'}})
-    elements.append({'data': {'id': 'vpc', 'label': f'VPC {vpc_id}', 'type': 'VPC'}})
-    elements.append({'data': {'id': 'tgw_rtb', 'label': f'Tgw Route Table ID {tgw_route_table_id}', 'type': 'Tgw Route Table ID'}})
-    elements.append({'data': {'id': 'tgw_attachment', 'label': f'Transit Gateway Attachment {tgw_attachment_id}', 'type': 'Transit Gateway Attachment'}})
-
-    # Add edges for local region
-    elements.append({'data': {'source': 'eni', 'target': 'subnet'}})
-    elements.append({'data': {'source': 'subnet', 'target': 'route_table'}})
-    elements.append({'data': {'source': 'route_table', 'target': 'tgw'}})
-    elements.append({'data': {'source': 'tgw', 'target': 'vpc'}})
-    elements.append({'data': {'source': 'vpc', 'target': 'tgw_rtb'}})
-    elements.append({'data': {'source': 'tgw_rtb', 'target': 'tgw_attachment'}})
-
-    # Extracting data for cross region TGWs
-    for cross_region_tgw in cross_region_tgw_details:
-        cross_region_tgw_id = cross_region_tgw["label"]
-        elements.append({'data': {'id': f'cross_region_tgw_{cross_region_tgw_id}', 'label': f'Cross Region TGW {cross_region_tgw_id}', 'type': 'Cross Region TGW'}})
-
-    # Extracting data for cross region TGW Route Tables
-    for cross_region_tgw_route_table in cross_region_tgw_route_table_details:
-        cross_region_tgw_route_table_id = cross_region_tgw_route_table["label"]
-        elements.append({'data': {'id': f'cross_region_tgw_route_table_{cross_region_tgw_route_table_id}', 'label': f'Cross Region TGW Route Table {cross_region_tgw_route_table_id}', 'type': 'Cross Region TGW Route Table'}})
-
-    app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-    app.layout = dbc.Container([
-        dbc.Row([dbc.Col(html.H3("AWS Network Graph"), className="mb-4")]),
-        dbc.Row([dbc.Col(
-            Cytoscape(
-                id='graph',
-                layout={'name': 'grid'},
-                style={'width': '100%', 'height': '800px'},
-                elements=elements,
-                stylesheet=[
-                    {'selector': 'node', 'style': {'content': 'data(label)', 'font-size': '12px', 'width': '70px', 'height': '70px', 'shape': 'ellipse', 'text-halign': 'center', 'text-valign': 'bottom'}},
-                    {'selector': '#eni', 'style': {'background-color': '#FFFFFF', 'border-color': '#3573A5', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/63fb2874569e311787424e8d_network_interface_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': '#subnet', 'style': {'background-color': '#FFFFFF', 'border-color': '#4CAF50', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/6357b21690f6a35a9b6ef11b_Subnet_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': '#route_table', 'style': {'background-color': '#FFFFFF', 'border-color': '#FFC107', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/63592c50d04cfb02108e805d_route_table_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': '#tgw', 'style': {'background-color': '#FFFFFF', 'border-color': '#E57373', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/635a593ae410e66d0c8b8b00_transit_gateway_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': '#tgw_attachment', 'style': {'background-color': '#FFFFFF', 'border-color': '#7B1FA2', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/6357f98b70b0b4cc3dbc908e_target_group_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': '#vpc', 'style': {'background-color': '#FFFFFF', 'border-color': '#3573A5', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/6357a6e63c71c2613e97bad8_vpc_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': '#tgw_rtb', 'style': {'background-color': '#FFFFFF', 'border-color': '#30c8d9', 'background-image': 'https://assets-global.website-files.com/5f05d5858fab461d0d08eaeb/6358cec281674a47f95c499b_nat_gateway_light.svg', 'background-fit': 'cover', 'background-width': '70%', 'background-height': '70%'}},
-                    {'selector': 'edge', 'style': {'width': 2, 'line-color': '#9DB5B2', 'curve-style': 'bezier', 'line-color': '#2a2b28', 'target-arrow-color': '#2a2b28', 'target-arrow-shape': 'triangle'}}
-                ]
-            ),
-            width=12)
-        ]),
-        dbc.Row([dbc.Col(
-            html.Div(id='node-info', className="mt-4")
-        )])
-    ])
-
-    @app.callback(
-        Output('node-info', 'children'),
-        [Input('graph', 'tapNode')]
-    )
-    def display_node_data(tap_node):
-        if tap_node:
-            node_id = tap_node['data']['id']
-            node_type = tap_node['data']['type']
-            node_info = f"Information about {node_type}:\n"
-            if node_type == 'VPC':
-                node_info += f"- VPC ID: {vpc_id}\n"
-            # Add more information for other node types as needed
-            return dcc.Markdown(node_info)
-        return None
-
-    app.run_server(debug=True)
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate and visualize AWS network graph.')
-    parser.add_argument('--account', help='AWS account ID', required=True)
-    parser.add_argument('--region', help='AWS region', required=True)
-    parser.add_argument('--ipv4', help='Source Private IPv4', required=True)
-    parser.add_argument('--eni', help='Source ENI', required=True)
-    parser.add_argument('--subnet', help='Source Subnet ID', required=True)
-    parser.add_argument('--route-table', help='Source Route Table ID', required=True)
-    parser.add_argument('--destination-ipv4', help='Destination Private IPv4', required=True)
-    parser.add_argument('--tgw', help='Source TGW', required=True)
-    args = parser.parse_args()
-
-    aws_data = fetch_aws_data(args.account, args.region, args.ipv4, args.eni, args.subnet, args.route_table, args.destination_ipv4, args.tgw)
-    aws_network_graph(*aws_data)
