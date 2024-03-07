@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './style.css'; // Assuming you have some custom styles
 
 const ImgUpload = ({ onChange, src }) => (
   <label htmlFor="photo-upload" className="custom-file-upload fas">
     <div className="img-wrap img-upload">
-      <img src={src} alt="Preview" />
+      <img src={src} alt="profile" />
     </div>
     <input id="photo-upload" type="file" onChange={onChange} />
   </label>
@@ -14,7 +15,7 @@ const ImgUpload = ({ onChange, src }) => (
 
 const Name = ({ onChange, value }) => (
   <div className="field">
-    <label htmlFor="name">Name:</label>
+    <label htmlFor="name">name:</label>
     <input
       id="name"
       type="text"
@@ -29,7 +30,7 @@ const Name = ({ onChange, value }) => (
 
 const Status = ({ onChange, value }) => (
   <div className="field">
-    <label htmlFor="status">Status:</label>
+    <label htmlFor="status">status:</label>
     <input
       id="status"
       type="text"
@@ -42,10 +43,15 @@ const Status = ({ onChange, value }) => (
   </div>
 );
 
-const Profile = ({ onSubmit, name, status }) => (
+const Profile = ({ onSubmit, src, name, status }) => (
   <div className="card">
     <form onSubmit={onSubmit}>
       <h1>Profile Card</h1>
+      <label className="custom-file-upload fas">
+        <div className="img-wrap">
+          <img src={src} alt="profile" />
+        </div>
+      </label>
       <div className="name">{name}</div>
       <div className="status">{status}</div>
       <button type="submit" className="edit">
@@ -121,21 +127,12 @@ const ProfileEditingPage = () => {
     <div className="profile-editing-container">
       <h1>Edit Profile</h1>
       <form onSubmit={handleSubmit}>
+        <ImgUpload onChange={handleImageChange} src={image ? URL.createObjectURL(image) : ''} />
         <Name onChange={(e) => setName(e.target.value)} value={name} />
-        <ImgUpload onChange={handleImageChange} src={image} />
-        <div className="form-group">
-          <label htmlFor="age">Age:</label>
-          <input type="number" id="age" value={age} onChange={(e) => setAge(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label htmlFor="dob">Date of Birth:</label>
-          <input type="date" id="dob" value={dob} onChange={(e) => setDob(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label htmlFor="description">Description:</label>
-          <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
-        </div>
-        <button type="submit" className="btn btn-primary">Save Changes</button>
+        <Status onChange={(e) => setDescription(e.target.value)} value={description} />
+        <button type="submit" className="btn btn-primary">
+          Save Changes
+        </button>
       </form>
       <ToastContainer />
     </div>
