@@ -27,39 +27,47 @@ const Name = ({ onChange, value }) => (
   </div>
 );
 
-const Profile = ({ onSubmit, src, name, age, dob, description }) => (
-  <div className="profile-editing-container">
-    <h1>Edit Profile</h1>
-    <form onSubmit={onSubmit}>
-      <div className="form-group">
-        <label htmlFor="name">Name:</label>
-        <input type="text" id="name" value={name} onChange={e => onChange(e, 'name')} />
-      </div>
-      <div className="form-group">
-        <label htmlFor="age">Age:</label>
-        <input type="number" id="age" value={age} onChange={e => onChange(e, 'age')} />
-      </div>
-      <div className="form-group">
-        <label htmlFor="dob">Date of Birth:</label>
-        <input type="date" id="dob" value={dob} onChange={e => onChange(e, 'dob')} />
-      </div>
-      <div className="form-group">
-        <label htmlFor="description">Description:</label>
-        <textarea id="description" value={description} onChange={e => onChange(e, 'description')} />
-      </div>
-      <div className="form-group">
-        <label htmlFor="image">Profile Picture:</label>
-        <ImgUpload onChange={onChange} src={src} />
-      </div>
-      <button type="submit" className="btn btn-primary">
-        Save Changes
-      </button>
-    </form>
-    <ToastContainer />
+const Status = ({ onChange, value }) => (
+  <div className="field">
+    <label htmlFor="status">Status:</label>
+    <input
+      id="status"
+      type="text"
+      onChange={onChange}
+      maxLength="35"
+      value={value}
+      placeholder="It's a nice day!"
+      required
+    />
   </div>
 );
 
-export default function ProfileEditingPage() {
+const Profile = ({ onSubmit, name, status }) => (
+  <div className="card">
+    <form onSubmit={onSubmit}>
+      <h1>Profile Card</h1>
+      <div className="name">{name}</div>
+      <div className="status">{status}</div>
+      <button type="submit" className="edit">
+        Edit Profile
+      </button>
+    </form>
+  </div>
+);
+
+const Edit = ({ onSubmit, children }) => (
+  <div className="card">
+    <form onSubmit={onSubmit}>
+      <h1>Profile Card</h1>
+      {children}
+      <button type="submit" className="save">
+        Save
+      </button>
+    </form>
+  </div>
+);
+
+const ProfileEditingPage = () => {
   const [name, setName] = useState('');
   const [image, setImage] = useState(null);
   const [age, setAge] = useState('');
@@ -109,35 +117,29 @@ export default function ProfileEditingPage() {
       });
   };
 
-  const handleChange = (e, field) => {
-    const value = e.target.value;
-    switch (field) {
-      case 'name':
-        setName(value);
-        break;
-      case 'age':
-        setAge(value);
-        break;
-      case 'dob':
-        setDob(value);
-        break;
-      case 'description':
-        setDescription(value);
-        break;
-      default:
-        break;
-    }
-  };
-
   return (
-    <Profile
-      onSubmit={handleSubmit}
-      src={image ? URL.createObjectURL(image) : ''}
-      name={name}
-      age={age}
-      dob={dob}
-      description={description}
-      onChange={handleChange}
-    />
+    <div className="profile-editing-container">
+      <h1>Edit Profile</h1>
+      <form onSubmit={handleSubmit}>
+        <Name onChange={(e) => setName(e.target.value)} value={name} />
+        <ImgUpload onChange={handleImageChange} src={image} />
+        <div className="form-group">
+          <label htmlFor="age">Age:</label>
+          <input type="number" id="age" value={age} onChange={(e) => setAge(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label htmlFor="dob">Date of Birth:</label>
+          <input type="date" id="dob" value={dob} onChange={(e) => setDob(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label htmlFor="description">Description:</label>
+          <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <button type="submit" className="btn btn-primary">Save Changes</button>
+      </form>
+      <ToastContainer />
+    </div>
   );
-}
+};
+
+export default ProfileEditingPage;
